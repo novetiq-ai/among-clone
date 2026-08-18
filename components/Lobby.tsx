@@ -22,7 +22,13 @@ import {
   Sparkles,
   Info,
   Laptop,
+  Bot,
+  UserPlus,
+  UserMinus,
+  Trash2,
+  Sliders,
 } from 'lucide-react';
+
 
 interface LobbyProps {
   isHost: boolean;
@@ -37,6 +43,8 @@ interface LobbyProps {
   onSendMessage: (text: string) => void;
   onStartGame: () => void;
   onLeaveRoom: () => void;
+  onAddBot?: () => void;
+  onRemoveBot?: (botId?: string) => void;
 }
 
 export function Lobby({
@@ -52,7 +60,10 @@ export function Lobby({
   onSendMessage,
   onStartGame,
   onLeaveRoom,
+  onAddBot,
+  onRemoveBot,
 }: LobbyProps) {
+
   const [copied, setCopied] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -312,6 +323,12 @@ export function Lobby({
 
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 flex justify-between">
+                <span className="text-slate-400">Bots:</span>
+                <span className={`font-bold ${settings.botCount === 0 ? 'text-slate-400' : 'text-purple-400'}`}>
+                  {settings.botCount === 0 ? 'Aus' : `${settings.botCount} Bots`}
+                </span>
+              </div>
+              <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 flex justify-between">
                 <span className="text-slate-400">Impostor:</span>
                 <span className="font-bold text-red-400">{settings.impostorCount}</span>
               </div>
@@ -322,10 +339,6 @@ export function Lobby({
               <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 flex justify-between">
                 <span className="text-slate-400">Kill CD:</span>
                 <span className="font-bold text-amber-400">{settings.killCooldown}s</span>
-              </div>
-              <div className="bg-slate-950/70 p-2 rounded-lg border border-slate-800 flex justify-between">
-                <span className="text-slate-400">Tasks:</span>
-                <span className="font-bold text-emerald-400">{settings.totalTasksPerPlayer}</span>
               </div>
             </div>
           </div>
@@ -363,7 +376,7 @@ export function Lobby({
           {activeTab === 'crew' && (
             <div className="flex-1 bg-slate-900/80 border-2 border-blue-500/20 rounded-2xl p-6 shadow-2xl flex flex-col justify-between relative overflow-hidden min-h-[380px]">
               <div>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
                       <span>Raumschiff-Besatzung</span>
@@ -377,13 +390,88 @@ export function Lobby({
                   </div>
                 </div>
 
+                {/* Host Bot Management Bar */}
+                {isHost && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-xl p-3 mb-5 shadow-inner">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/40">
+                        <Bot className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-mono font-bold text-white block">Bot-Steuerung</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {playerList.filter((p) => p.isBot).length > 0
+                            ? `${playerList.filter((p) => p.isBot).length} KI-Bots aktiv`
+                            : '0 Bots (Reines Spieler-Match)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={playerList.filter((p) => p.isBot).length === 0}
+                        onClick={() => onRemoveBot && onRemoveBot()}
+                        className="px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 disabled:opacity-30 disabled:cursor-not-allowed border border-red-800/60 text-red-300 text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        title="Einen Bot entfernen"
+                      >
+                        <UserMinus className="w-3.5 h-3.5" />
+                        <span>- Bot</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={playerList.length >= settings.maxPlayers}
+                        onClick={() => onAddBot && onAddBot()}
+                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-mono font-bold transition-all flex items-center gap-1 shadow cursor-pointer"
+                        title="Einen Bot hinzufügen"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>+ Bot</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const botCount = playerList.filter((p) => p.isBot).length;
+                          if (botCount > 0) {
+                            onUpdateSettings({ botCount: 0 });
+                          } else {
+                            onUpdateSettings({ botCount: 4 });
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                          playerList.filter((p) => p.isBot).length > 0
+                            ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300 hover:bg-purple-600/50'
+                            : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                        }`}
+                      >
+                        {playerList.filter((p) => p.isBot).length > 0 ? 'Bots: AN' : 'Bots: AUS'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Player Roster Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                   {playerList.map((player) => (
                     <div
                       key={player.id}
-                      className="bg-slate-950/80 border border-slate-800 hover:border-slate-600 rounded-xl p-4 flex flex-col items-center justify-center gap-2 shadow-inner transition-all hover:scale-105"
+                      className={`relative bg-slate-950/80 border rounded-xl p-4 flex flex-col items-center justify-center gap-2 shadow-inner transition-all hover:scale-105 ${
+                        player.isBot ? 'border-purple-500/40 shadow-purple-950/30' : 'border-slate-800 hover:border-slate-600'
+                      }`}
                     >
+                      {/* If Bot and isHost, render kick button */}
+                      {player.isBot && isHost && (
+                        <button
+                          onClick={() => onRemoveBot && onRemoveBot(player.id)}
+                          title={`${player.name} entfernen`}
+                          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xs font-bold shadow-md cursor-pointer transition-transform hover:scale-110 z-10"
+                        >
+                          ✕
+                        </button>
+                      )}
+
                       <AstronautAvatar
                         color={player.color}
                         hat={player.hat || 'none'}
@@ -392,6 +480,12 @@ export function Lobby({
                         name={player.name}
                         isReady={player.isHost ? undefined : player.isReady}
                       />
+
+                      {player.isBot && (
+                        <span className="text-[9px] font-mono font-black uppercase px-2 py-0.5 rounded-full bg-purple-950/90 text-purple-300 border border-purple-500/40 flex items-center gap-1 shadow-sm">
+                          <Bot className="w-2.5 h-2.5" /> BOT
+                        </span>
+                      )}
                     </div>
                   ))}
 
@@ -511,10 +605,10 @@ export function Lobby({
       {/* Settings Modal (Host Only) */}
       {showSettingsModal && isHost && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border-2 border-blue-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl flex flex-col gap-5 animate-in fade-in zoom-in-95">
+          <div className="bg-slate-900 border-2 border-blue-500/40 rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col gap-5 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-mono font-bold text-white flex items-center gap-2">
-                <Settings className="w-4 h-4 text-blue-400" /> Spiel-Einstellungen
+                <Sliders className="w-4 h-4 text-blue-400" /> Spiel-Einstellungen
               </h3>
               <button
                 onClick={() => setShowSettingsModal(false)}
@@ -525,11 +619,45 @@ export function Lobby({
             </div>
 
             <div className="space-y-4 text-xs font-mono">
+              {/* Bot Control */}
+              <div className="flex flex-col gap-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5 text-purple-400" />
+                    <span>KI-Bots im Spiel</span>
+                  </label>
+                  <span className="text-xs font-bold text-purple-400">
+                    {settings.botCount === 0 ? 'Aus (0)' : `${settings.botCount} Bots`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                  {[0, 1, 2, 3, 4, 5, 6, 8].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => onUpdateSettings({ botCount: count })}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                        settings.botCount === count
+                          ? 'bg-purple-600 text-white border border-purple-400 shadow-md shadow-purple-900/40'
+                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {count === 0 ? '0 (Aus)' : count}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                  {settings.botCount === 0
+                    ? '💡 Reines Multiplayer: Nur du und deine echten Mitspieler.'
+                    : `💡 Füllt das Schiff mit ${settings.botCount} autonomen KI-Bots auf.`}
+                </p>
+              </div>
+
               {/* Impostors */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800">
                 <label className="text-slate-300 font-semibold">Anzahl Impostor</label>
                 <div className="flex items-center gap-2">
-                  {[1, 2].map((num) => (
+                  {[1, 2, 3].map((num) => (
                     <button
                       key={num}
                       type="button"
@@ -537,7 +665,7 @@ export function Lobby({
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         settings.impostorCount === num
                           ? 'bg-red-600 text-white border border-red-400'
-                          : 'bg-slate-800 text-slate-400'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
                       }`}
                     >
                       {num}
@@ -547,18 +675,18 @@ export function Lobby({
               </div>
 
               {/* Player Speed */}
-              <div className="flex items-center justify-between">
-                <label className="text-slate-300 font-semibold">Tempo</label>
-                <div className="flex items-center gap-2">
-                  {[1.0, 1.25, 1.5, 1.75].map((spd) => (
+              <div className="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                <label className="text-slate-300 font-semibold">Lauftempo</label>
+                <div className="flex items-center gap-1.5">
+                  {[0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((spd) => (
                     <button
                       key={spd}
                       type="button"
                       onClick={() => onUpdateSettings({ playerSpeed: spd })}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         settings.playerSpeed === spd
                           ? 'bg-cyan-600 text-white border border-cyan-400'
-                          : 'bg-slate-800 text-slate-400'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
                       }`}
                     >
                       {spd}x
@@ -568,18 +696,18 @@ export function Lobby({
               </div>
 
               {/* Kill Cooldown */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800">
                 <label className="text-slate-300 font-semibold">Kill-Cooldown</label>
-                <div className="flex items-center gap-2">
-                  {[15, 25, 35, 45].map((cd) => (
+                <div className="flex items-center gap-1.5">
+                  {[10, 15, 20, 25, 35, 45].map((cd) => (
                     <button
                       key={cd}
                       type="button"
                       onClick={() => onUpdateSettings({ killCooldown: cd })}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         settings.killCooldown === cd
                           ? 'bg-amber-600 text-white border border-amber-400'
-                          : 'bg-slate-800 text-slate-400'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
                       }`}
                     >
                       {cd}s
@@ -589,23 +717,66 @@ export function Lobby({
               </div>
 
               {/* Tasks per Player */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800">
                 <label className="text-slate-300 font-semibold">Tasks / Spieler</label>
-                <div className="flex items-center gap-2">
-                  {[2, 3, 4, 6].map((tsk) => (
+                <div className="flex items-center gap-1.5">
+                  {[2, 3, 4, 5, 6, 8].map((tsk) => (
                     <button
                       key={tsk}
                       type="button"
                       onClick={() => onUpdateSettings({ totalTasksPerPlayer: tsk })}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         settings.totalTasksPerPlayer === tsk
                           ? 'bg-emerald-600 text-white border border-emerald-400'
-                          : 'bg-slate-800 text-slate-400'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
                       }`}
                     >
                       {tsk}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Discussion & Voting Times */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex flex-col gap-1.5">
+                  <label className="text-slate-300 font-semibold">Diskussions-Zeit</label>
+                  <div className="flex items-center gap-1">
+                    {[0, 10, 15, 30].map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => onUpdateSettings({ discussionTime: t })}
+                        className={`flex-1 py-1 rounded text-[11px] font-bold ${
+                          settings.discussionTime === t
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        {t}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex flex-col gap-1.5">
+                  <label className="text-slate-300 font-semibold">Voting-Zeit</label>
+                  <div className="flex items-center gap-1">
+                    {[15, 30, 45, 60].map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => onUpdateSettings({ votingTime: t })}
+                        className={`flex-1 py-1 rounded text-[11px] font-bold ${
+                          settings.votingTime === t
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-900 text-slate-400'
+                        }`}
+                      >
+                        {t}s
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -615,11 +786,12 @@ export function Lobby({
               onClick={() => setShowSettingsModal(false)}
               className="mt-2 w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono font-bold text-xs uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-blue-900/40"
             >
-              Einstellungen Speichern
+              Einstellungen Schließen
             </button>
           </div>
         </div>
       )}
+
 
       {/* Telemetry Footer */}
       <footer className="relative z-10 h-12 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm flex items-center px-6 sm:px-8 justify-between">

@@ -564,15 +564,45 @@ function AmongUsApp() {
         completedTasks: [],
       };
 
+      const initialPlayers: Record<string, Player> = { [peerId]: hostPlayer };
+      const takenColors = [color];
+      const availableColors = PLAYER_COLORS.map((c) => c.id).filter((c) => !takenColors.includes(c));
+      const botNames = ['Orion', 'Nova', 'Pulsar', 'Cosmo', 'Orbit', 'AstroBot', 'Blauhelm', 'Sternenpilot'];
+
+      for (let i = 0; i < DEFAULT_SETTINGS.botCount; i++) {
+        const botId = `bot_${Date.now()}_${i}`;
+        const botColor = availableColors[i] || 'yellow';
+        const randomHat = HATS[Math.floor(Math.random() * HATS.length)].id;
+        const spawnPos = getSpawnPosition(1 + i);
+        initialPlayers[botId] = {
+          id: botId,
+          name: botNames[i % botNames.length] || `Bot ${i + 1}`,
+          color: botColor,
+          hat: randomHat,
+          isHost: false,
+          isReady: true,
+          role: 'unassigned',
+          isAlive: true,
+          x: spawnPos.x,
+          y: spawnPos.y,
+          facing: 'left',
+          isMoving: false,
+          assignedTasks: [],
+          completedTasks: [],
+          isBot: true,
+        };
+      }
+
       const initialGameState: GameState = {
         roomCode: code,
         phase: 'lobby',
-        players: { [peerId]: hostPlayer },
+        players: initialPlayers,
         deadBodies: [],
         settings: { ...DEFAULT_SETTINGS },
         totalTasksCount: 0,
         completedTasksCount: 0,
       };
+
 
       setLocalPlayerId(peerId);
       setIsHost(true);
@@ -686,24 +716,178 @@ function AmongUsApp() {
   };
 
 
-  // Update Game Settings (Host only)
-  const handleUpdateSettings = (newSettings: Partial<GameSettings>) => {
+  // Add Bot to Lobby (Host Only)
+  const handleAddBot = useCallback(() => {
     if (!isHost) return;
     setGameState((prev) => {
-      const updated = {
+      const currentPlayers = Object.values(prev.players);
+      if (currentPlayers.length >= prev.settings.maxPlayers) return prev;
+
+      const takenColors = currentPlayers.map((p) => p.color);
+      const availableColors = PLAYER_COLORS.map((c) => c.id).filter((c) => !takenColors.includes(c));
+      const botColor = availableColors[0] || 'yellow';
+
+      const botNames = ['Orion', 'Nova', 'Pulsar', 'Cosmo', 'Orbit', 'AstroBot', 'Blauhelm', 'Sternenpilot', 'Atlas', 'Titan', 'Zeus', 'Apollo'];
+      const existingBotNames = currentPlayers.filter((p) => p.isBot).map((p) => p.name);
+      const name = botNames.find((n) => !existingBotNames.includes(n)) || `Bot ${currentPlayers.length + 1}`;
+
+      const randomHat = HATS[Math.floor(Math.random() * HATS.length)].id;
+      const botId = `bot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const spawnPos = getSpawnPosition(currentPlayers.length);
+
+      const newBot: Player = {
+        id: botId,
+        name,
+        color: botColor,
+        hat: randomHat,
+        isHost: false,
+        isReady: true,
+        role: 'unassigned',
+        isAlive: true,
+        x: spawnPos.x,
+        y: spawnPos.y,
+        facing: 'left',
+        isMoving: false,
+        assignedTasks: [],
+        completedTasks: [],
+        isBot: true,
+      };
+
+      const updatedPlayers = {
+        ...prev.players,
+        [botId]: newBot,
+      };
+
+      const botCount = Object.values(updatedPlayers).filter((p) => p.isBot).length;
+      const nextState: GameState = {
         ...prev,
+        players: updatedPlayers,
+        settings: {
+          ...prev.settings,
+          botCount,
+        },
+      };
+
+      networkRef.current?.broadcast({
+        type: 'STATE_SYNC',
+        gameState: nextState,
+      });
+
+      return nextState;
+    });
+  }, [isHost]);
+
+  // Remove Bot from Lobby (Host Only)
+  const handleRemoveBot = useCallback((botIdToRemove?: string) => {
+    if (!isHost) return;
+    setGameState((prev) => {
+      const updatedPlayers = { ...prev.players };
+      const bots = Object.values(updatedPlayers).filter((p) => p.isBot);
+      if (bots.length === 0) return prev;
+
+      const targetId = botIdToRemove || bots[bots.length - 1].id;
+      delete updatedPlayers[targetId];
+
+      const botCount = Object.values(updatedPlayers).filter((p) => p.isBot).length;
+      const nextState: GameState = {
+        ...prev,
+        players: updatedPlayers,
+        settings: {
+          ...prev.settings,
+          botCount,
+        },
+      };
+
+      networkRef.current?.broadcast({
+        type: 'STATE_SYNC',
+        gameState: nextState,
+      });
+
+      return nextState;
+    });
+  }, [isHost]);
+
+  // Update Game Settings (Host only) with dynamic bot count sync
+  const handleUpdateSettings = useCallback((newSettings: Partial<GameSettings>) => {
+    if (!isHost) return;
+    setGameState((prev) => {
+      let updatedPlayers = { ...prev.players };
+
+      // Handle dynamic bot count adjustment
+      if (newSettings.botCount !== undefined) {
+        const targetBotCount = newSettings.botCount;
+        const currentBots = Object.values(updatedPlayers).filter((p) => p.isBot);
+        const currentBotCount = currentBots.length;
+
+        if (targetBotCount === 0) {
+          // Remove all bots
+          currentBots.forEach((b) => {
+            delete updatedPlayers[b.id];
+          });
+        } else if (targetBotCount > currentBotCount) {
+          // Add extra bots
+          const needed = targetBotCount - currentBotCount;
+          for (let i = 0; i < needed; i++) {
+            const currentList = Object.values(updatedPlayers);
+            if (currentList.length >= prev.settings.maxPlayers) break;
+            const takenColors = currentList.map((p) => p.color);
+            const availableColors = PLAYER_COLORS.map((c) => c.id).filter((c) => !takenColors.includes(c));
+            const botColor = availableColors[0] || 'yellow';
+            const botNames = ['Orion', 'Nova', 'Pulsar', 'Cosmo', 'Orbit', 'AstroBot', 'Blauhelm', 'Sternenpilot', 'Atlas', 'Titan'];
+            const existingBotNames = currentList.filter((p) => p.isBot).map((p) => p.name);
+            const name = botNames.find((n) => !existingBotNames.includes(n)) || `Bot ${currentList.length + 1}`;
+            const randomHat = HATS[Math.floor(Math.random() * HATS.length)].id;
+            const botId = `bot_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 5)}`;
+            const spawnPos = getSpawnPosition(currentList.length);
+
+            updatedPlayers[botId] = {
+              id: botId,
+              name,
+              color: botColor,
+              hat: randomHat,
+              isHost: false,
+              isReady: true,
+              role: 'unassigned',
+              isAlive: true,
+              x: spawnPos.x,
+              y: spawnPos.y,
+              facing: 'left',
+              isMoving: false,
+              assignedTasks: [],
+              completedTasks: [],
+              isBot: true,
+            };
+          }
+        } else if (targetBotCount < currentBotCount) {
+          // Remove excess bots
+          const toRemove = currentBotCount - targetBotCount;
+          for (let i = 0; i < toRemove; i++) {
+            const remainingBots = Object.values(updatedPlayers).filter((p) => p.isBot);
+            if (remainingBots.length > 0) {
+              const lastBot = remainingBots[remainingBots.length - 1];
+              delete updatedPlayers[lastBot.id];
+            }
+          }
+        }
+      }
+
+      const nextState: GameState = {
+        ...prev,
+        players: updatedPlayers,
         settings: {
           ...prev.settings,
           ...newSettings,
         },
       };
+
       networkRef.current?.broadcast({
         type: 'STATE_SYNC',
-        gameState: updated,
+        gameState: nextState,
       });
-      return updated;
+
+      return nextState;
     });
-  };
+  }, [isHost]);
 
   // Send Chat Message
   const handleSendMessage = (text: string) => {
@@ -738,35 +922,38 @@ function AmongUsApp() {
     setGameState((prev) => {
       const playersMap = { ...prev.players };
       const currentCount = Object.keys(playersMap).length;
+      const currentBots = Object.values(playersMap).filter((p) => p.isBot).length;
 
-      // Populate dummy bots if needed to ensure full match
-      const neededBots = Math.max(0, Math.min(prev.settings.botCount, prev.settings.maxPlayers - currentCount));
-      const takenColors = Object.values(playersMap).map((p) => p.color);
-      const availableColors = PLAYER_COLORS.map((c) => c.id).filter((c) => !takenColors.includes(c));
+      // Only spawn additional bots if explicitly configured in settings and not already in lobby
+      if (prev.settings.botCount > 0 && currentBots < prev.settings.botCount) {
+        const neededBots = Math.max(0, Math.min(prev.settings.botCount - currentBots, prev.settings.maxPlayers - currentCount));
+        const takenColors = Object.values(playersMap).map((p) => p.color);
+        const availableColors = PLAYER_COLORS.map((c) => c.id).filter((c) => !takenColors.includes(c));
 
-      for (let i = 0; i < neededBots; i++) {
-        const botId = `bot-${i + 1}`;
-        const botColor = availableColors[i] || 'yellow';
-        const botNames = ['Blauhelm', 'Sternenpilot', 'AstroBot', 'Orion', 'Nova', 'Pulsar', 'Cosmo', 'Orbit'];
-        const spawnPos = getSpawnPosition(currentCount + i);
-        const randomHat = HATS[Math.floor(Math.random() * HATS.length)].id;
-        playersMap[botId] = {
-          id: botId,
-          name: botNames[i % botNames.length] || `Bot ${i + 1}`,
-          color: botColor,
-          hat: randomHat,
-          isHost: false,
-          isReady: true,
-          role: 'unassigned',
-          isAlive: true,
-          x: spawnPos.x,
-          y: spawnPos.y,
-          facing: 'left',
-          isMoving: false,
-          assignedTasks: [],
-          completedTasks: [],
-          isBot: true,
-        };
+        for (let i = 0; i < neededBots; i++) {
+          const botId = `bot_${Date.now()}_${i}`;
+          const botColor = availableColors[i] || 'yellow';
+          const botNames = ['Blauhelm', 'Sternenpilot', 'AstroBot', 'Orion', 'Nova', 'Pulsar', 'Cosmo', 'Orbit'];
+          const spawnPos = getSpawnPosition(currentCount + i);
+          const randomHat = HATS[Math.floor(Math.random() * HATS.length)].id;
+          playersMap[botId] = {
+            id: botId,
+            name: botNames[i % botNames.length] || `Bot ${i + 1}`,
+            color: botColor,
+            hat: randomHat,
+            isHost: false,
+            isReady: true,
+            role: 'unassigned',
+            isAlive: true,
+            x: spawnPos.x,
+            y: spawnPos.y,
+            facing: 'left',
+            isMoving: false,
+            assignedTasks: [],
+            completedTasks: [],
+            isBot: true,
+          };
+        }
       }
 
       const allPlayerIds = Object.keys(playersMap);
@@ -800,6 +987,7 @@ function AmongUsApp() {
             if (chosenTasks.length >= prev.settings.totalTasksPerPlayer) break;
           }
         }
+
         if (chosenTasks.length < prev.settings.totalTasksPerPlayer) {
           for (const t of shuffledTasks) {
             if (!chosenTasks.some((c) => c.id === t.id)) {
@@ -808,6 +996,7 @@ function AmongUsApp() {
             }
           }
         }
+
 
         const assigned = chosenTasks.map((t) => t.id);
         playersMap[pId].assignedTasks = assigned;
@@ -1568,8 +1757,11 @@ function AmongUsApp() {
           onSendMessage={handleSendMessage}
           onStartGame={handleStartGame}
           onLeaveRoom={handleLeaveRoom}
+          onAddBot={handleAddBot}
+          onRemoveBot={handleRemoveBot}
         />
       ) : gameState.phase === 'role_reveal' ? (
+
         // Cinematic Role Reveal Screen
         <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in zoom-in-95 duration-500">
           <div className="mb-6 transform scale-150">
