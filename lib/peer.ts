@@ -62,12 +62,13 @@ export class NetworkManager {
     return new Promise((resolve, reject) => {
       const channel = supabase.channel(channelName, {
         config: {
-          broadcast: { ack: false, self: false },
+          broadcast: { ack: true },
           presence: { key: this.localPlayerId },
         },
       });
 
       this.channel = channel;
+
 
       // Handle broadcast messages
       channel.on('broadcast', { event: 'msg' }, ({ payload }) => {
@@ -136,7 +137,7 @@ export class NetworkManager {
     return new Promise((resolve, reject) => {
       const channel = supabase.channel(channelName, {
         config: {
-          broadcast: { ack: false, self: false },
+          broadcast: { ack: true },
           presence: { key: this.localPlayerId },
         },
       });
@@ -208,7 +209,7 @@ export class NetworkManager {
           };
 
           sendJoin();
-          joinInterval = setInterval(sendJoin, 1000);
+          joinInterval = setInterval(sendJoin, 800);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           clearTimeout(timeoutId);
           if (joinInterval) clearInterval(joinInterval);
@@ -296,11 +297,12 @@ export class NetworkManager {
       event: 'msg',
       payload: {
         senderId: this.localPlayerId,
-        recipientId: this.hostId || 'host',
+        recipientId: 'all',
         message,
       },
     });
   }
+
 
   public destroy() {
     if (this.channel) {
