@@ -18,6 +18,19 @@ export function formatRoomId(code: string): string {
   return `${ROOM_PREFIX}${code.trim().toUpperCase()}`;
 }
 
+export const PEER_ICE_CONFIG = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+    ],
+  },
+};
+
 export type NetworkEventHandler = (message: NetworkMessage, senderId: string) => void;
 
 export class NetworkManager {
@@ -44,10 +57,8 @@ export class NetworkManager {
     const { default: Peer } = await import('peerjs');
 
     return new Promise((resolve, reject) => {
-      // Create Peer with designated ID
-      const peer = new Peer(peerId, {
-        debug: 1,
-      });
+      // Create Peer with designated ID & STUN NAT traversal
+      const peer = new Peer(peerId, PEER_ICE_CONFIG);
 
       peer.on('open', (id) => {
         this.peer = peer;
@@ -78,10 +89,9 @@ export class NetworkManager {
     const { default: Peer } = await import('peerjs');
 
     return new Promise((resolve, reject) => {
-      // Client gets an auto-assigned peer ID
-      const peer = new Peer({
-        debug: 1,
-      });
+      // Client gets an auto-assigned peer ID & STUN NAT traversal
+      const peer = new Peer(PEER_ICE_CONFIG);
+
 
       let timeoutId: NodeJS.Timeout;
 
