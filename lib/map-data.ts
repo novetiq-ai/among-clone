@@ -404,18 +404,73 @@ export const WALLS: WallBox[] = [
 ];
 
 // ============================================================================
+// LOCKED DOOR COLLIDERS (during Door Sabotage)
+// ============================================================================
+export const LOCKED_DOOR_WALLS: Record<string, WallBox[]> = {
+  cafeteria: [
+    { x: 880, y: 460, width: 40, height: 120, isObstacle: true }, // NW doorway
+    { x: 1480, y: 460, width: 40, height: 120, isObstacle: true }, // NE doorway
+    { x: 1060, y: 880, width: 200, height: 40, isObstacle: true }, // South doorway
+  ],
+  medbay: [
+    { x: 880, y: 460, width: 40, height: 120, isObstacle: true },
+    { x: 670, y: 600, width: 140, height: 40, isObstacle: true },
+  ],
+  security: [
+    { x: 600, y: 740, width: 40, height: 140, isObstacle: true },
+    { x: 670, y: 600, width: 140, height: 40, isObstacle: true },
+    { x: 670, y: 880, width: 140, height: 40, isObstacle: true },
+  ],
+  electrical: [
+    { x: 670, y: 880, width: 140, height: 40, isObstacle: true },
+    { x: 920, y: 1060, width: 40, height: 160, isObstacle: true },
+    { x: 580, y: 1140, width: 40, height: 120, isObstacle: true },
+  ],
+  storage: [
+    { x: 1060, y: 1000, width: 200, height: 40, isObstacle: true },
+    { x: 1380, y: 1000, width: 40, height: 140, isObstacle: true },
+    { x: 860, y: 1060, width: 40, height: 160, isObstacle: true },
+    { x: 1240, y: 1440, width: 100, height: 40, isObstacle: true },
+  ],
+  admin: [
+    { x: 1460, y: 1000, width: 40, height: 140, isObstacle: true },
+  ],
+  reactor: [
+    { x: 200, y: 580, width: 160, height: 40, isObstacle: true },
+    { x: 200, y: 1040, width: 160, height: 40, isObstacle: true },
+    { x: 400, y: 760, width: 40, height: 140, isObstacle: true },
+  ],
+  upper_engine: [
+    { x: 580, y: 440, width: 40, height: 140, isObstacle: true },
+    { x: 220, y: 580, width: 40, height: 100, isObstacle: true },
+  ],
+  lower_engine: [
+    { x: 580, y: 1140, width: 40, height: 140, isObstacle: true },
+    { x: 220, y: 1040, width: 40, height: 120, isObstacle: true },
+  ],
+};
+
+// ============================================================================
 // BULLETPROOF CONTINUOUS COLLISION CHECK & MOVEMENT RESOLVER
 // ============================================================================
 
 /**
- * Checks if a circle at (x, y) with radius overlaps ANY solid wall or obstacle.
+ * Checks if a circle at (x, y) with radius overlaps ANY solid wall, obstacle or locked door.
  * Dead ghosts (isGhost = true) bypass collision.
  */
-export function checkCollision(x: number, y: number, radius = 16, isGhost = false): boolean {
+export function checkCollision(
+  x: number,
+  y: number,
+  radius = 16,
+  isGhost = false,
+  lockedDoors?: Record<string, number>
+): boolean {
   if (isGhost) return false;
 
+  const now = Date.now();
+
+  // Test static structural walls and obstacles
   for (const wall of WALLS) {
-    // Nearest point on AABB box to circle center
     const nearestX = Math.max(wall.x, Math.min(x, wall.x + wall.width));
     const nearestY = Math.max(wall.y, Math.min(y, wall.y + wall.height));
 
@@ -426,11 +481,35 @@ export function checkCollision(x: number, y: number, radius = 16, isGhost = fals
       return true;
     }
   }
+
+  // Test active locked doors
+  if (lockedDoors) {
+    for (const [roomKey, expiry] of Object.entries(lockedDoors)) {
+      if (expiry > now) {
+        const normalizedKey = roomKey.toLowerCase().replace(/\s+/g, '_');
+        const doorList = LOCKED_DOOR_WALLS[normalizedKey] || LOCKED_DOOR_WALLS[roomKey.toLowerCase()];
+        if (doorList) {
+          for (const doorWall of doorList) {
+            const nearestX = Math.max(doorWall.x, Math.min(x, doorWall.x + doorWall.width));
+            const nearestY = Math.max(doorWall.y, Math.min(y, doorWall.y + doorWall.height));
+
+            const dx = x - nearestX;
+            const dy = y - nearestY;
+
+            if (dx * dx + dy * dy < radius * radius) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+
   return false;
 }
 
 /**
- * Resolves player movement with sub-stepping and axis-independent sliding.
+ * Resolves player movement with sub-stepping, axis-independent sliding, and locked door blocking.
  * Prevents tunneling through walls at any speed, even with frame rate drops.
  */
 export function resolvePlayerMovement(
@@ -439,7 +518,8 @@ export function resolvePlayerMovement(
   moveDx: number,
   moveDy: number,
   radius = 16,
-  isGhost = false
+  isGhost = false,
+  lockedDoors?: Record<string, number>
 ): { x: number; y: number; moved: boolean } {
   if (isGhost) {
     return {
@@ -464,19 +544,19 @@ export function resolvePlayerMovement(
   for (let s = 0; s < steps; s++) {
     // Try moving in X axis
     const nextX = px + stepX;
-    if (!checkCollision(nextX, py, radius, false)) {
+    if (!checkCollision(nextX, py, radius, false, lockedDoors)) {
       px = Math.max(60, Math.min(MAP_WIDTH - 60, nextX));
     }
 
     // Try moving in Y axis
     const nextY = py + stepY;
-    if (!checkCollision(px, nextY, radius, false)) {
+    if (!checkCollision(px, nextY, radius, false, lockedDoors)) {
       py = Math.max(340, Math.min(MAP_HEIGHT - 120, nextY));
     }
   }
 
-  // Anti-trap pushout: If somehow inside a wall, nudge towards room center
-  if (checkCollision(px, py, radius - 2, false)) {
+  // Anti-trap pushout: If somehow inside a wall, nudge towards nearest safe position
+  if (checkCollision(px, py, radius - 2, false, lockedDoors)) {
     const safePos = getNearestSafePosition(px, py);
     px = safePos.x;
     py = safePos.y;
@@ -488,6 +568,7 @@ export function resolvePlayerMovement(
     moved: px !== currentX || py !== currentY,
   };
 }
+
 
 /**
  * Safe pushout for players caught in a collider (e.g. after emergency meeting spawn)

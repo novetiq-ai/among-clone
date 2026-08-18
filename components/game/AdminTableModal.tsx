@@ -2,17 +2,19 @@
 
 import React from 'react';
 import { X, MapPin, Users } from 'lucide-react';
-import { Player } from '@/types/game';
+import { Player, DeadBody } from '@/types/game';
 import { ROOMS, getCurrentRoomName } from '@/lib/map-data';
 
 interface AdminTableModalProps {
   players: Record<string, Player>;
+  deadBodies?: DeadBody[];
   onClose: () => void;
 }
 
-export function AdminTableModal({ players, onClose }: AdminTableModalProps) {
-  // Count players in each room
+export function AdminTableModal({ players, deadBodies = [], onClose }: AdminTableModalProps) {
+  // Count living players + unreported dead bodies in each room
   const livingPlayers = Object.values(players).filter((p) => p.isAlive && !p.inVent);
+  const activeBodies = deadBodies.filter((b) => !b.reported);
 
   const roomCounts: Record<string, number> = {};
   for (const room of ROOMS) {
@@ -27,6 +29,16 @@ export function AdminTableModal({ players, onClose }: AdminTableModalProps) {
       roomCounts['Flur'] = (roomCounts['Flur'] || 0) + 1;
     }
   }
+
+  for (const b of activeBodies) {
+    const roomName = getCurrentRoomName(b.x, b.y);
+    if (roomCounts[roomName] !== undefined) {
+      roomCounts[roomName]++;
+    } else {
+      roomCounts['Flur'] = (roomCounts['Flur'] || 0) + 1;
+    }
+  }
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">

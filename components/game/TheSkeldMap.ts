@@ -1,4 +1,4 @@
-import { ROOMS, CORRIDORS, WALLS, ALL_TASKS, VENTS, EMERGENCY_BUTTON_POS, SECURITY_CAMERAS } from '@/lib/map-data';
+import { ROOMS, CORRIDORS, WALLS, ALL_TASKS, VENTS, EMERGENCY_BUTTON_POS, SECURITY_CAMERAS, LOCKED_DOOR_WALLS } from '@/lib/map-data';
 import { Player, DeadBody, PLAYER_COLORS, ActiveSabotage, HatType } from '@/types/game';
 
 // Helper for rendering glowing circular items
@@ -68,15 +68,41 @@ function lineIntersectsBox(
   );
 }
 
-export function hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
+export function hasLineOfSight(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  lockedDoors?: Record<string, number>
+): boolean {
   for (const wall of WALLS) {
     if (wall.isObstacle) continue; // Furniture doesn't block LOS
     if (lineIntersectsBox(x1, y1, x2, y2, wall.x, wall.y, wall.width, wall.height)) {
       return false;
     }
   }
+
+  // Active locked doors also block line of sight
+  if (lockedDoors) {
+    const now = Date.now();
+    for (const [roomKey, expiry] of Object.entries(lockedDoors)) {
+      if (expiry > now) {
+        const normalizedKey = roomKey.toLowerCase().replace(/\s+/g, '_');
+        const doorList = LOCKED_DOOR_WALLS[normalizedKey] || LOCKED_DOOR_WALLS[roomKey.toLowerCase()];
+        if (doorList) {
+          for (const doorWall of doorList) {
+            if (lineIntersectsBox(x1, y1, x2, y2, doorWall.x, doorWall.y, doorWall.width, doorWall.height)) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+
   return true;
 }
+
 
 export function drawTheSkeld(
   ctx: CanvasRenderingContext2D,
@@ -136,10 +162,11 @@ export function drawTheSkeld(
   drawEmergencyButton(ctx, localPlayer, time);
 
   // 12. Draw Dead Bodies on the floor (filtered by Line of Sight)
-  drawDeadBodies(ctx, deadBodies, localPlayer, time, activeSabotage);
+  drawDeadBodies(ctx, deadBodies, localPlayer, time, activeSabotage, lockedDoors);
 
   // 13. Draw Players (Living & Ghost Crewmates, filtered by Line of Sight)
-  drawPlayers(ctx, players, localPlayer, time, activeSabotage);
+  drawPlayers(ctx, players, localPlayer, time, activeSabotage, lockedDoors);
+
 
   // 14. Draw Solid Ship Walls & Structural Bulkheads (drawn over players for realistic 2.5D occlusion)
   drawWallsAndBulkheads(ctx, time);
@@ -1226,7 +1253,8 @@ function drawDeadBodies(
   deadBodies: DeadBody[],
   localPlayer: Player,
   time: number,
-  activeSabotage?: ActiveSabotage | null
+  activeSabotage?: ActiveSabotage | null,
+  lockedDoors?: Record<string, number>
 ) {
   const isLocalGhost = !localPlayer.isAlive;
   const isLightsOut = activeSabotage?.type === 'lights';
@@ -1240,7 +1268,7 @@ function drawDeadBodies(
     // Line of sight check for living players
     if (!isLocalGhost) {
       if (dist > visionRadius) continue;
-      if (!hasLineOfSight(localPlayer.x, localPlayer.y, body.x, body.y)) continue;
+      if (!hasLineOfSight(localPlayer.x, localPlayer.y, body.x, body.y, lockedDoors)) continue;
     }
 
     const colInfo = PLAYER_COLORS.find((c) => c.id === body.color) || PLAYER_COLORS[0];
@@ -1309,7 +1337,8 @@ function drawPlayers(
   players: Record<string, Player>,
   localPlayer: Player,
   time: number,
-  activeSabotage?: ActiveSabotage | null
+  activeSabotage?: ActiveSabotage | null,
+  lockedDoors?: Record<string, number>
 ) {
   const isLocalGhost = !localPlayer.isAlive;
   const isLightsOut = activeSabotage?.type === 'lights';
@@ -1328,8 +1357,9 @@ function drawPlayers(
     // Line of Sight & Distance check for living crewmates
     if (!isLocal && !isLocalGhost) {
       if (dist > visionRadius) continue;
-      if (!hasLineOfSight(localPlayer.x, localPlayer.y, p.x, p.y)) continue;
+      if (!hasLineOfSight(localPlayer.x, localPlayer.y, p.x, p.y, lockedDoors)) continue;
     }
+
 
     ctx.save();
     ctx.translate(p.x, p.y);

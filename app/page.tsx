@@ -25,6 +25,7 @@ import { EjectionScreen } from '@/components/game/EjectionScreen';
 import { GameOverModal } from '@/components/game/GameOverModal';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
 import { SabotageType, ActiveSabotage, HatType, HATS } from '@/types/game';
+import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 
 function AmongUsApp() {
   const searchParams = useSearchParams();
@@ -56,8 +57,8 @@ function AmongUsApp() {
 
   // Game State
   const [gameState, setGameState] = useState<GameState>({
-    roomCode: '',
     phase: 'lobby',
+    roomCode: '',
     players: {},
     deadBodies: [],
     settings: { ...DEFAULT_SETTINGS },
@@ -66,17 +67,26 @@ function AmongUsApp() {
     activeSabotage: null,
     isSecurityCamActive: false,
     lockedDoors: {},
+    isEmergencyMeeting: false,
   });
 
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  // Network & Timer Refs
   const networkRef = useRef<NetworkManager | null>(null);
   const meetingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const botIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sabotageIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const botTargetState = useRef<Record<string, { targetX: number; targetY: number; path: any[]; pathIdx: number; pauseTicks: number }>>({});
+  const botTargetState = useRef<Record<string, { targetX: number; targetY: number; path: any[]; pathIdx: number; pauseTicks: number; killCooldownTicks?: number }>>({});
 
   // Helper to check win conditions (Authoritative on Host)
   const checkWinConditions = useCallback((state: GameState): { winner?: 'crewmates' | 'impostors'; winReason?: string } => {
+    // Only evaluate during active gameplay, meeting or ejection
+    if (state.phase !== 'playing' && state.phase !== 'meeting' && state.phase !== 'ejection') {
+      return {};
+    }
+
     const playersList = Object.values(state.players);
     const alivePlayers = playersList.filter((p) => p.isAlive);
     const aliveImpostors = alivePlayers.filter((p) => p.role === 'impostor');
@@ -1073,7 +1083,7 @@ function AmongUsApp() {
     };
   }, [isHost, gameState.phase]);
 
-  // Host Bot Simulation Loop (Waypoint NavMesh Pathfinding - No wall clipping!)
+  // Host Bot Simulation Loop (Waypoint NavMesh Pathfinding, Stealth Kills & Body Reports)
   useEffect(() => {
     if (!isHost || gameState.phase !== 'playing') {
       if (botIntervalRef.current) clearInterval(botIntervalRef.current);
@@ -1084,34 +1094,132 @@ function AmongUsApp() {
       setGameState((prev) => {
         if (prev.phase !== 'playing') return prev;
 
-        const updatedPlayers = { ...prev.players };
-        let anyBotMoved = false;
 
-        Object.values(updatedPlayers).forEach((p) => {
+        const updatedPlayers = { ...prev.players };
+        let updatedDeadBodies = [...prev.deadBodies];
+        let anyBotMoved = false;
+        let triggeredReport = false;
+        let reportingBotId: string | null = null;
+
+        const allPlayersList = Object.values(updatedPlayers);
+        const now = Date.now();
+
+        for (const p of allPlayersList) {
           if (p.isBot && p.isAlive && !p.inVent) {
             anyBotMoved = true;
 
-            // Initialize or retrieve bot target waypoint path
+            // Initialize bot state
             let bState = botTargetState.current[p.id];
-            if (!bState || bState.path.length === 0 || bState.pathIdx >= bState.path.length) {
-              // Pick a random task station or waypoint as new target
-              const targetTask = ALL_TASKS[Math.floor(Math.random() * ALL_TASKS.length)];
-              const path = findBotPath(p.x, p.y, targetTask.x, targetTask.y);
+            if (!bState) {
               bState = {
-                targetX: targetTask.x,
-                targetY: targetTask.y,
-                path,
+                targetX: p.x,
+                targetY: p.y,
+                path: [],
                 pathIdx: 0,
                 pauseTicks: 0,
+                killCooldownTicks: Math.floor(prev.settings.killCooldown * 5),
               };
               botTargetState.current[p.id] = bState;
             }
 
-            // If bot is pausing at task to simulate doing it
+            // Decrement kill cooldown ticks
+            if (bState.killCooldownTicks && bState.killCooldownTicks > 0) {
+              bState.killCooldownTicks--;
+            }
+
+            // 1. BOT CREWMATE: Check for dead bodies in Line of Sight to report
+            if (p.role !== 'impostor' && !triggeredReport) {
+              for (const body of updatedDeadBodies) {
+                if (body.reported) continue;
+                const d = Math.hypot(p.x - body.x, p.y - body.y);
+                if (d < 180 && hasLineOfSight(p.x, p.y, body.x, body.y, prev.lockedDoors)) {
+                  triggeredReport = true;
+                  reportingBotId = p.id;
+                  break;
+                }
+              }
+            }
+
+            // 2. BOT IMPOSTOR: Check for isolated crewmate to kill
+            if (p.role === 'impostor' && (!bState.killCooldownTicks || bState.killCooldownTicks <= 0)) {
+              const potentialVictims = allPlayersList.filter(
+                (v) => v.id !== p.id && v.isAlive && v.role !== 'impostor' && !v.inVent
+              );
+
+              for (const victim of potentialVictims) {
+                const distToVictim = Math.hypot(p.x - victim.x, p.y - victim.y);
+                if (distToVictim < 90 && hasLineOfSight(p.x, p.y, victim.x, victim.y, prev.lockedDoors)) {
+                  // Check for witnesses with LOS
+                  const witnesses = allPlayersList.filter(
+                    (w) =>
+                      w.id !== p.id &&
+                      w.id !== victim.id &&
+                      w.isAlive &&
+                      !w.inVent &&
+                      Math.hypot(w.x - victim.x, w.y - victim.y) < 220 &&
+                      hasLineOfSight(w.x, w.y, victim.x, victim.y, prev.lockedDoors)
+                  );
+
+                  // If no witnesses or high stealth chance, execute kill!
+                  if (witnesses.length === 0 || Math.random() < 0.25) {
+                    updatedPlayers[victim.id] = {
+                      ...victim,
+                      isAlive: false,
+                    };
+                    updatedDeadBodies.push({
+                      id: `body-${now}-${victim.id}`,
+                      playerId: victim.id,
+                      playerName: victim.name,
+                      color: victim.color,
+                      hat: victim.hat,
+                      x: victim.x,
+                      y: victim.y,
+                      reported: false,
+                    });
+                    sound.playKillSound();
+                    bState.killCooldownTicks = Math.floor(prev.settings.killCooldown * 5);
+                    break;
+                  }
+                }
+              }
+            }
+
+            // 3. Navigation & Pathfinding
+            if (!bState.path || bState.path.length === 0 || bState.pathIdx >= bState.path.length) {
+              // Prioritize sabotage repair if active, otherwise random task
+              let targetX = p.x;
+              let targetY = p.y;
+
+              if (prev.activeSabotage && p.role !== 'impostor' && Math.random() < 0.6) {
+                if (prev.activeSabotage.type === 'lights') {
+                  targetX = 670;
+                  targetY = 960;
+                } else if (prev.activeSabotage.type === 'reactor') {
+                  targetX = 140;
+                  targetY = 720;
+                } else if (prev.activeSabotage.type === 'o2') {
+                  targetX = 1740;
+                  targetY = 800;
+                }
+              } else {
+                const targetTask = ALL_TASKS[Math.floor(Math.random() * ALL_TASKS.length)];
+                targetX = targetTask.x;
+                targetY = targetTask.y;
+              }
+
+              const path = findBotPath(p.x, p.y, targetX, targetY);
+              bState.targetX = targetX;
+              bState.targetY = targetY;
+              bState.path = path;
+              bState.pathIdx = 0;
+              bState.pauseTicks = 0;
+            }
+
+            // If bot is pausing at task to simulate work
             if (bState.pauseTicks > 0) {
               bState.pauseTicks--;
               p.isMoving = false;
-              return;
+              continue;
             }
 
             const currentWaypoint = bState.path[bState.pathIdx];
@@ -1140,23 +1248,58 @@ function AmongUsApp() {
               }
             }
           }
-        });
+        }
+
+        // If a bot reported a dead body, trigger emergency meeting!
+        if (triggeredReport && reportingBotId && updatedPlayers[reportingBotId]) {
+          const reporter = updatedPlayers[reportingBotId];
+          sound.playEmergencySiren();
+          const nextMeetingState: GameState = {
+            ...prev,
+            phase: 'meeting',
+            players: updatedPlayers,
+            deadBodies: updatedDeadBodies,
+            meetingReporterName: reporter.name,
+            meetingReporterColor: reporter.color,
+            isEmergencyMeeting: false,
+            meetingPhase: 'discussion',
+            meetingTimer: prev.settings.discussionTime,
+            activeSabotage: null,
+          };
+          networkRef.current?.broadcast({ type: 'STATE_SYNC', gameState: nextMeetingState });
+          return nextMeetingState;
+        }
+
+
+        const nextState: GameState = {
+          ...prev,
+          players: updatedPlayers,
+          deadBodies: updatedDeadBodies,
+        };
+
+        const winCheck = checkWinConditions(nextState);
+        if (winCheck.winner) {
+          nextState.phase = 'game_over';
+          nextState.winner = winCheck.winner;
+          nextState.winReason = winCheck.winReason;
+        }
 
         if (anyBotMoved) {
           networkRef.current?.broadcast({
             type: 'STATE_SYNC',
-            gameState: { ...prev, players: updatedPlayers },
+            gameState: nextState,
           });
         }
 
-        return { ...prev, players: updatedPlayers };
+        return nextState;
       });
     }, 200);
 
     return () => {
       if (botIntervalRef.current) clearInterval(botIntervalRef.current);
     };
-  }, [isHost, gameState.phase]);
+  }, [isHost, gameState.phase, checkWinConditions]);
+
 
   // Player Actions: Move, Kill, Report, Meeting, Task, Vent, Sabotage
   const handlePlayerMove = (

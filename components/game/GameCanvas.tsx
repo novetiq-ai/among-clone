@@ -21,7 +21,7 @@ import {
   resolvePlayerMovement,
   getCurrentRoomName,
 } from '@/lib/map-data';
-import { drawTheSkeld } from './TheSkeldMap';
+import { drawTheSkeld, hasLineOfSight } from './TheSkeldMap';
 import { TaskModal } from './tasks/TaskModal';
 import { VirtualJoystick } from './VirtualJoystick';
 import { SkeldMinimapModal } from './SkeldMinimapModal';
@@ -359,14 +359,15 @@ export function GameCanvas({
               const moveX = dx * baseSpeed * delta;
               const moveY = dy * baseSpeed * delta;
 
-              // Airtight Sub-Stepping Collision Solver
+              // Airtight Sub-Stepping Collision Solver with Locked Doors
               const resolved = resolvePlayerMovement(
                 posRef.current.x,
                 posRef.current.y,
                 moveX,
                 moveY,
                 16,
-                !localPlayer.isAlive
+                !localPlayer.isAlive,
+                lockedDoors
               );
 
               posRef.current.x = resolved.x;
@@ -400,9 +401,14 @@ export function GameCanvas({
           const currentX = posRef.current.x;
           const currentY = posRef.current.y;
 
-          // Emergency Button Proximity in Cafeteria
+          // Emergency Button Proximity in Cafeteria (Blocked during active Sabotage Crisis!)
           const distToEmergency = Math.hypot(currentX - EMERGENCY_BUTTON_POS.x, currentY - EMERGENCY_BUTTON_POS.y);
-          setNearbyEmergencyButton(distToEmergency < 90 && localPlayer.isAlive && !localPlayer.inVent);
+          setNearbyEmergencyButton(
+            distToEmergency < 90 &&
+            localPlayer.isAlive &&
+            !localPlayer.inVent &&
+            !activeSabotage
+          );
 
           // Security CCTV Console Proximity
           const distToSecurityDesk = Math.hypot(currentX - 740, currentY - 750);
@@ -431,37 +437,42 @@ export function GameCanvas({
           }
           setNearbyFixSabotage(nearbySab);
 
-          // Task Proximity
+          // Task Proximity (Living Crewmates and Dead Ghosts can do tasks)
           let foundTask: TaskDefinition | null = null;
-          for (const t of ALL_TASKS) {
-            if (localPlayer.assignedTasks.includes(t.id) && !localPlayer.completedTasks.includes(t.id)) {
-              const d = Math.hypot(currentX - t.x, currentY - t.y);
-              if (d < 75) {
-                foundTask = t;
-                break;
+          if (!localPlayer.inVent) {
+            for (const t of ALL_TASKS) {
+              if (localPlayer.assignedTasks.includes(t.id) && !localPlayer.completedTasks.includes(t.id)) {
+                const d = Math.hypot(currentX - t.x, currentY - t.y);
+                if (d < 75) {
+                  foundTask = t;
+                  break;
+                }
               }
             }
           }
           setNearbyTask(foundTask);
 
-          // Dead Body Proximity
+          // Dead Body Proximity (Requires living player + Line of Sight)
           let foundBody: DeadBody | null = null;
-          for (const b of deadBodies) {
-            const d = Math.hypot(currentX - b.x, currentY - b.y);
-            if (d < 120) {
-              foundBody = b;
-              break;
+          if (localPlayer.isAlive && !localPlayer.inVent) {
+            for (const b of deadBodies) {
+              if (b.reported) continue;
+              const d = Math.hypot(currentX - b.x, currentY - b.y);
+              if (d < 120 && hasLineOfSight(currentX, currentY, b.x, b.y, lockedDoors)) {
+                foundBody = b;
+                break;
+              }
             }
           }
           setNearbyDeadBody(foundBody);
 
-          // Kill Target Proximity (for Impostors)
+          // Kill Target Proximity (Requires Impostor + Living Victim + Line of Sight through walls & locked doors)
           let foundKillTarget: Player | null = null;
           if (localPlayer.role === 'impostor' && localPlayer.isAlive && !localPlayer.inVent) {
             for (const p of Object.values(players)) {
               if (p.id !== localPlayerId && p.isAlive && p.role !== 'impostor' && !p.inVent) {
                 const d = Math.hypot(currentX - p.x, currentY - p.y);
-                if (d < 110) {
+                if (d < 110 && hasLineOfSight(currentX, currentY, p.x, p.y, lockedDoors)) {
                   foundKillTarget = p;
                   break;
                 }
@@ -482,6 +493,7 @@ export function GameCanvas({
             }
           }
           setNearbyVent(foundVent);
+
 
           // 3. Camera Offset (Centered on Local Player)
           const viewX = currentX - canvas.width / 2;
@@ -896,6 +908,7 @@ export function GameCanvas({
       {showAdminRadar && (
         <AdminTableModal
           players={players}
+          deadBodies={deadBodies}
           onClose={() => setShowAdminRadar(false)}
         />
       )}
