@@ -1,5 +1,5 @@
-import { ROOMS, CORRIDORS, WALLS, ALL_TASKS, VENTS, EMERGENCY_BUTTON_POS } from '@/lib/map-data';
-import { Player, DeadBody, PLAYER_COLORS } from '@/types/game';
+import { ROOMS, CORRIDORS, WALLS, ALL_TASKS, VENTS, EMERGENCY_BUTTON_POS, SECURITY_CAMERAS } from '@/lib/map-data';
+import { Player, DeadBody, PLAYER_COLORS, ActiveSabotage } from '@/types/game';
 
 // Helper for rendering glowing circular items
 function drawGlowCircle(
@@ -20,6 +20,64 @@ function drawGlowCircle(
   ctx.restore();
 }
 
+/**
+ * 2D Raycast Line-Of-Sight Helper:
+ * Tests if the straight line between (x1, y1) and (x2, y2) intersects any solid structural wall.
+ */
+function lineIntersectsBox(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  bx: number,
+  by: number,
+  bw: number,
+  bh: number
+): boolean {
+  const minX = Math.min(x1, x2);
+  const maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2);
+  const maxY = Math.max(y1, y2);
+
+  // Fast AABB bounding check
+  if (maxX < bx || minX > bx + bw || maxY < by || minY > by + bh) {
+    return false;
+  }
+
+  const ccw = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
+    (cy - ay) * (bx - ax) > (by - ay) * (cx - ax);
+
+  const intersect = (
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    cx: number,
+    cy: number,
+    dx: number,
+    dy: number
+  ) =>
+    ccw(ax, ay, cx, cy, dx, dy) !== ccw(bx, by, cx, cy, dx, dy) &&
+    ccw(ax, ay, bx, by, cx, cy) !== ccw(ax, ay, bx, by, dx, dy);
+
+  return (
+    intersect(x1, y1, x2, y2, bx, by, bx + bw, by) ||
+    intersect(x1, y1, x2, y2, bx + bw, by, bx + bw, by + bh) ||
+    intersect(x1, y1, x2, y2, bx + bw, by + bh, bx, by + bh) ||
+    intersect(x1, y1, x2, y2, bx, by + bh, bx, by)
+  );
+}
+
+export function hasLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
+  for (const wall of WALLS) {
+    if (wall.isObstacle) continue; // Furniture doesn't block LOS
+    if (lineIntersectsBox(x1, y1, x2, y2, wall.x, wall.y, wall.width, wall.height)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function drawTheSkeld(
   ctx: CanvasRenderingContext2D,
   viewX: number,
@@ -29,7 +87,10 @@ export function drawTheSkeld(
   localPlayer: Player,
   players: Record<string, Player>,
   deadBodies: DeadBody[],
-  activeTaskId: string | null
+  activeTaskId: string | null,
+  activeSabotage?: ActiveSabotage | null,
+  isSecurityCamActive?: boolean,
+  lockedDoors?: Record<string, number>
 ) {
   ctx.save();
 
@@ -49,7 +110,7 @@ export function drawTheSkeld(
   drawShipHull(ctx, time);
 
   // 4. Draw Room Floors & Hallways with authentic Skeld panels
-  drawShipFloors(ctx, time);
+  drawShipFloors(ctx, time, activeSabotage);
 
   // 5. Draw Hazard Stripes & Room Decals
   drawRoomDecals(ctx, time);
@@ -60,24 +121,32 @@ export function drawTheSkeld(
   // 7. Draw Vents
   drawVents(ctx, localPlayer, time);
 
-  // 8. Draw Task Stations with Glowing Interactive Prompts
+  // 8. Draw Security Cameras on Hallway Walls
+  drawSecurityCameras(ctx, isSecurityCamActive || false, time);
+
+  // 9. Draw Locked Doors (if door sabotage active)
+  if (lockedDoors) {
+    drawLockedDoors(ctx, lockedDoors, time);
+  }
+
+  // 10. Draw Task Stations with Glowing Interactive Prompts
   drawTaskStations(ctx, localPlayer, activeTaskId, time);
 
-  // 9. Draw Emergency Button in Cafeteria
+  // 11. Draw Emergency Button in Cafeteria
   drawEmergencyButton(ctx, localPlayer, time);
 
-  // 10. Draw Dead Bodies on the floor
-  drawDeadBodies(ctx, deadBodies, time);
+  // 12. Draw Dead Bodies on the floor (filtered by Line of Sight)
+  drawDeadBodies(ctx, deadBodies, localPlayer, time, activeSabotage);
 
-  // 11. Draw Players (Living & Ghost Crewmates) with authentic walk animations
-  drawPlayers(ctx, players, localPlayer, time);
+  // 13. Draw Players (Living & Ghost Crewmates, filtered by Line of Sight)
+  drawPlayers(ctx, players, localPlayer, time, activeSabotage);
 
-  // 12. Draw Solid Ship Walls & Structural Bulkheads (drawn over players for realistic occlusion)
+  // 14. Draw Solid Ship Walls & Structural Bulkheads (drawn over players for realistic 2.5D occlusion)
   drawWallsAndBulkheads(ctx, time);
 
-  // 13. Dynamic Vision & Lighting (Fog of War / Flashlight Vignette)
+  // 15. Dynamic Vision & Lighting (Fog of War / Flashlight Vignette / Alarm Strobes)
   ctx.restore(); // Restore camera translation to screen space
-  drawDynamicLighting(ctx, canvasWidth, canvasHeight, localPlayer);
+  drawDynamicLighting(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
 }
 
 // Deep Space starfield with nebulae, floating asteroids & twinkling stars
@@ -239,7 +308,7 @@ function drawShipHull(ctx: CanvasRenderingContext2D, time: number) {
 }
 
 // Floors & Room Panels
-function drawShipFloors(ctx: CanvasRenderingContext2D, time: number) {
+function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabotage?: ActiveSabotage | null) {
   // 1. Draw Hallway connections from CORRIDORS
   for (const corr of CORRIDORS) {
     ctx.fillStyle = '#1c2638';
@@ -1065,9 +1134,115 @@ function drawTaskStations(
   }
 }
 
-// Dead Bodies on the floor (authentic severed bean with vertebra bone)
-function drawDeadBodies(ctx: CanvasRenderingContext2D, deadBodies: DeadBody[], time: number) {
+// Security Cameras mounted on the corridor bulkheads
+function drawSecurityCameras(ctx: CanvasRenderingContext2D, isSecurityCamActive: boolean, time: number) {
+  for (const cam of SECURITY_CAMERAS) {
+    ctx.save();
+    ctx.translate(cam.x, cam.y);
+
+    // Wall Mount Bracket
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(-8, -8, 16, 16);
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-8, -8, 16, 16);
+
+    // Camera Lens Body
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Red blinking LED when someone is in Security viewing CCTV!
+    const isBlinking = isSecurityCamActive && Math.sin(time / 150) > 0;
+    ctx.fillStyle = isSecurityCamActive ? (isBlinking ? '#ef4444' : '#7f1d1d') : '#22c55e';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isSecurityCamActive && isBlinking) {
+      drawGlowCircle(ctx, 0, 0, 7, 'rgba(239, 68, 68, 0.85)', 12);
+    }
+
+    ctx.restore();
+  }
+}
+
+// Locked Doors (during Impostor Door Sabotage)
+function drawLockedDoors(ctx: CanvasRenderingContext2D, lockedDoors: Record<string, number>, time: number) {
+  const now = Date.now();
+  const roomDoorways: Record<string, Array<{ x: number; y: number; w: number; h: number }>> = {
+    Cafeteria: [
+      { x: 890, y: 460, w: 25, h: 120 },
+      { x: 1475, y: 460, w: 25, h: 120 },
+      { x: 1060, y: 890, w: 200, h: 25 },
+    ],
+    MedBay: [
+      { x: 930, y: 460, w: 25, h: 100 },
+      { x: 670, y: 610, w: 120, h: 25 },
+    ],
+    Security: [
+      { x: 670, y: 630, w: 120, h: 25 },
+      { x: 670, y: 890, w: 120, h: 25 },
+      { x: 610, y: 740, w: 25, h: 120 },
+    ],
+    Electrical: [
+      { x: 670, y: 910, w: 120, h: 25 },
+      { x: 930, y: 1080, w: 25, h: 120 },
+    ],
+    Storage: [
+      { x: 1060, y: 1010, w: 200, h: 25 },
+      { x: 890, y: 1080, w: 25, h: 120 },
+      { x: 1390, y: 1020, w: 25, h: 120 },
+    ],
+  };
+
+  for (const [room, expiry] of Object.entries(lockedDoors)) {
+    if (expiry > now && roomDoorways[room]) {
+      for (const door of roomDoorways[room]) {
+        // Red blast door bulkheads
+        ctx.fillStyle = '#7f1d1d';
+        ctx.fillRect(door.x, door.y, door.w, door.h);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(door.x, door.y, door.w, door.h);
+
+        // Hazard diagonal stripes on locked door
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('LOCKED', door.x + door.w / 2, door.y + door.h / 2 + 4);
+      }
+    }
+  }
+}
+
+// Dead Bodies on the floor (filtered by Line of Sight & Distance)
+function drawDeadBodies(
+  ctx: CanvasRenderingContext2D,
+  deadBodies: DeadBody[],
+  localPlayer: Player,
+  time: number,
+  activeSabotage?: ActiveSabotage | null
+) {
+  const isLocalGhost = !localPlayer.isAlive;
+  const isLightsOut = activeSabotage?.type === 'lights';
+  const visionRadius = localPlayer.role === 'impostor' ? 380 : isLightsOut ? 110 : 280;
+
   for (const body of deadBodies) {
+    if (body.reported) continue;
+
+    const dist = Math.hypot(body.x - localPlayer.x, body.y - localPlayer.y);
+
+    // Line of sight check for living players
+    if (!isLocalGhost) {
+      if (dist > visionRadius) continue;
+      if (!hasLineOfSight(localPlayer.x, localPlayer.y, body.x, body.y)) continue;
+    }
+
     const colInfo = PLAYER_COLORS.find((c) => c.id === body.color) || PLAYER_COLORS[0];
 
     ctx.save();
@@ -1128,21 +1303,37 @@ function drawDeadBodies(ctx: CanvasRenderingContext2D, deadBodies: DeadBody[], t
   }
 }
 
-// Draw Players (Living Crewmates & Translucent Ghosts) with authentic walk animations
+// Draw Players (filtered by Line of Sight & Distance for true stealth)
 function drawPlayers(
   ctx: CanvasRenderingContext2D,
   players: Record<string, Player>,
   localPlayer: Player,
-  time: number
+  time: number,
+  activeSabotage?: ActiveSabotage | null
 ) {
+  const isLocalGhost = !localPlayer.isAlive;
+  const isLightsOut = activeSabotage?.type === 'lights';
+  const visionRadius = localPlayer.role === 'impostor' ? 380 : isLightsOut ? 110 : 280;
+
   for (const p of Object.values(players)) {
     // If player is in vent, don't draw for others
     if (p.inVent && p.id !== localPlayer.id) continue;
 
+    // Ghosts are only visible to other ghosts, or local player to themselves
+    if (!p.isAlive && !isLocalGhost && p.id !== localPlayer.id) continue;
+
+    const isLocal = p.id === localPlayer.id;
+    const dist = Math.hypot(p.x - localPlayer.x, p.y - localPlayer.y);
+
+    // Line of Sight & Distance check for living crewmates
+    if (!isLocal && !isLocalGhost) {
+      if (dist > visionRadius) continue;
+      if (!hasLineOfSight(localPlayer.x, localPlayer.y, p.x, p.y)) continue;
+    }
+
     ctx.save();
     ctx.translate(p.x, p.y);
 
-    const isLocal = p.id === localPlayer.id;
     const isGhost = !p.isAlive;
     const isLeft = p.facing === 'left';
     const isMoving = p.isMoving;
@@ -1276,7 +1467,6 @@ function drawPlayers(
     // ----------------------------------------------------
     // Player Name Tag & Impostor Recognition
     // ----------------------------------------------------
-    // Un-flip coordinate system for text rendering so name is never backwards
     if (isLeft) {
       ctx.scale(-1, 1);
     }
@@ -1285,7 +1475,7 @@ function drawPlayers(
     const isLocalImpostor = localPlayer.role === 'impostor';
     const isPlayerImpostor = p.role === 'impostor';
 
-    // Impostors see their fellow impostor teammate names in bold red
+    // Impostors see fellow impostors in bold red
     const isRedName = isLocalImpostor && isPlayerImpostor;
 
     // Text Shadow
@@ -1318,11 +1508,11 @@ function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
     ctx.fillRect(wall.x, wall.y + 8, wall.width, wall.height);
 
     // 2. Wall Main Face (Deep Navy-Slate: #1e293b)
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = wall.isObstacle ? '#273549' : '#1e293b';
     ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
 
     // 3. Wall Top Face / Rim Highlight (#334155 / #475569)
-    ctx.fillStyle = '#334155';
+    ctx.fillStyle = wall.isObstacle ? '#3b4c63' : '#334155';
     ctx.fillRect(wall.x, wall.y, wall.width, Math.min(6, wall.height));
 
     // 4. Wall Dark Border Stroke (#0f172a)
@@ -1332,32 +1522,54 @@ function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
   }
 }
 
-// Dynamic Vision & Lighting (Dramatic Fog of War + Flashlight cone)
+// Dynamic Vision & Lighting (Dramatic Fog of War + Flashlight cone + Crisis Strobes)
 function drawDynamicLighting(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
-  localPlayer: Player
+  localPlayer: Player,
+  activeSabotage?: ActiveSabotage | null,
+  time = 0
 ) {
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2;
 
-  // Impostors have wider night-vision (390px) vs Crewmates (300px)
-  const visionRadius = localPlayer.role === 'impostor' ? 390 : 300;
+  const isLightsOut = activeSabotage?.type === 'lights';
+  const isAlarm = activeSabotage?.type === 'reactor' || activeSabotage?.type === 'o2';
+
+  // Vision Radius
+  const visionRadius = localPlayer.role === 'impostor'
+    ? 380
+    : isLightsOut
+    ? 110
+    : 280;
 
   // Create soft radial vignette mask
   const grad = ctx.createRadialGradient(
     centerX,
     centerY,
-    visionRadius * 0.5,
+    visionRadius * 0.45,
     centerX,
     centerY,
     visionRadius * 1.25
   );
 
-  grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  grad.addColorStop(0.7, 'rgba(3, 7, 18, 0.45)');
-  grad.addColorStop(1, 'rgba(2, 6, 23, 0.94)');
+  if (isAlarm) {
+    // Red pulsing alarm strobe
+    const strobe = (Math.sin(time / 200) + 1) * 0.5;
+    grad.addColorStop(0, `rgba(239, 68, 68, ${0.12 * strobe})`);
+    grad.addColorStop(0.7, `rgba(127, 29, 29, ${0.4 + 0.25 * strobe})`);
+    grad.addColorStop(1, 'rgba(15, 23, 42, 0.96)');
+  } else if (isLightsOut && localPlayer.role !== 'impostor') {
+    // Heavy black darkness during blackout
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(0.6, 'rgba(2, 6, 23, 0.85)');
+    grad.addColorStop(1, 'rgba(2, 6, 23, 0.98)');
+  } else {
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grad.addColorStop(0.7, 'rgba(3, 7, 18, 0.45)');
+    grad.addColorStop(1, 'rgba(2, 6, 23, 0.94)');
+  }
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);

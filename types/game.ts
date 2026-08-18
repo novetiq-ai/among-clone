@@ -53,7 +53,9 @@ export type TaskType =
   | 'empty_garbage'
   | 'start_reactor'
   | 'inspect_sample'
-  | 'refuel_engines';
+  | 'refuel_engines'
+  | 'fix_lights'
+  | 'fix_reactor';
 
 export interface TaskDefinition {
   id: string;
@@ -160,6 +162,20 @@ export interface EjectionData {
   remainingImpostors: number;
 }
 
+export type SabotageType = 'lights' | 'reactor' | 'o2' | 'comms';
+
+export interface ActiveSabotage {
+  type: SabotageType;
+  countdown: number; // in seconds (30s countdown for reactor/o2)
+  timer?: number;
+  activatedAt?: number;
+  requiredFixes?: number;
+  currentFixes?: number;
+  fixedSwitches?: boolean[]; // For lights (5 switches)
+  reactorHands?: string[]; // Player IDs holding hand scanners
+  o2FixedRooms?: string[]; // ['O2', 'Admin']
+}
+
 export interface GameState {
   roomCode: string;
   phase: GamePhase;
@@ -176,6 +192,10 @@ export interface GameState {
   ejectionData?: EjectionData;
   totalTasksCount?: number;
   completedTasksCount?: number;
+  activeSabotage?: ActiveSabotage | null;
+  sabotageCooldown?: number;
+  lockedDoors?: Record<string, number>; // Room name -> unlock timestamp
+  isSecurityCamActive?: boolean;
 }
 
 // Network Message Types
@@ -197,4 +217,8 @@ export type NetworkMessage =
   | { type: 'CAST_VOTE'; voterId: string; targetId: string | 'skip' }
   | { type: 'COMPLETE_TASK'; playerId: string; taskId: string }
   | { type: 'VENT_ACTION'; playerId: string; ventId: string; action: 'enter' | 'exit' | 'travel'; targetVentId?: string }
+  | { type: 'TRIGGER_SABOTAGE'; sabotageType: SabotageType }
+  | { type: 'FIX_SABOTAGE'; sabotageType: SabotageType; fixerId: string; payload?: any }
+  | { type: 'LOCK_DOORS'; room: string }
+  | { type: 'SECURITY_CAM_TOGGLE'; active: boolean; isActive?: boolean; viewerId?: string }
   | { type: 'PLAY_AGAIN' };

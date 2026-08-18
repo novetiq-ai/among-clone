@@ -18,6 +18,8 @@ import { EmptyGarbageTask } from './EmptyGarbageTask';
 import { StartReactorTask } from './StartReactorTask';
 import { InspectSampleTask } from './InspectSampleTask';
 import { RefuelEnginesTask } from './RefuelEnginesTask';
+import { FixLightsTask } from './FixLightsTask';
+import { FixReactorTask } from './FixReactorTask';
 
 interface TaskModalProps {
   task: TaskDefinition;
@@ -88,6 +90,12 @@ export function TaskModal({
       )}
       {task.type === 'refuel_engines' && (
         <RefuelEnginesTask onComplete={onComplete} onClose={onClose} />
+      )}
+      {task.type === 'fix_lights' && (
+        <FixLightsTask onComplete={onComplete} onClose={onClose} />
+      )}
+      {task.type === 'fix_reactor' && (
+        <FixReactorTask onComplete={onComplete} onClose={onClose} />
       )}
     </div>
   );

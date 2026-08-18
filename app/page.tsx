@@ -14,9 +14,9 @@ import {
   DeadBody,
   EjectionData,
 } from '@/types/game';
-import { ALL_TASKS, SPAWN_POSITION, getSpawnPosition } from '@/lib/map-data';
+import { ALL_TASKS, SPAWN_POSITION, getSpawnPosition, WAYPOINTS, findBotPath, getNearestWaypoint } from '@/lib/map-data';
 import { NetworkManager, generateRoomCode } from '@/lib/peer';
-import { sound } from '@/lib/sound';
+import { sound, playSabotageAlarm, playDoorLock } from '@/lib/sound';
 import { MainMenu } from '@/components/MainMenu';
 import { Lobby } from '@/components/Lobby';
 import { GameCanvas } from '@/components/game/GameCanvas';
@@ -24,6 +24,7 @@ import { MeetingModal } from '@/components/game/MeetingModal';
 import { EjectionScreen } from '@/components/game/EjectionScreen';
 import { GameOverModal } from '@/components/game/GameOverModal';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
+import { SabotageType, ActiveSabotage } from '@/types/game';
 
 function AmongUsApp() {
   const searchParams = useSearchParams();
@@ -62,12 +63,17 @@ function AmongUsApp() {
     settings: { ...DEFAULT_SETTINGS },
     totalTasksCount: 0,
     completedTasksCount: 0,
+    activeSabotage: null,
+    isSecurityCamActive: false,
+    lockedDoors: {},
   });
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const networkRef = useRef<NetworkManager | null>(null);
   const meetingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const botIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sabotageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const botTargetState = useRef<Record<string, { targetX: number; targetY: number; path: any[]; pathIdx: number; pauseTicks: number }>>({});
 
   // Helper to check win conditions (Authoritative on Host)
   const checkWinConditions = useCallback((state: GameState): { winner?: 'crewmates' | 'impostors'; winReason?: string } => {
@@ -292,6 +298,9 @@ function AmongUsApp() {
               newState.meetingPhase = 'discussion';
               newState.meetingTimer = newState.settings.discussionTime;
 
+              // Clear active sabotages when meeting starts
+              newState.activeSabotage = null;
+
               // Reset votes
               Object.values(newState.players).forEach((p) => {
                 p.hasVoted = false;
@@ -346,7 +355,6 @@ function AmongUsApp() {
                 newState.completedTasksCount = (newState.completedTasksCount || 0) + 1;
               }
 
-              // If host is the local player, immediately update localPlayer state as well
               if (msg.playerId === localPlayerId) {
                 setLocalPlayer((curr) => ({
                   ...curr,
@@ -388,6 +396,55 @@ function AmongUsApp() {
                 gameState: newState,
               });
             }
+            return newState;
+          }
+
+          case 'TRIGGER_SABOTAGE': {
+            playSabotageAlarm();
+            const countdown = msg.sabotageType === 'reactor' || msg.sabotageType === 'o2' ? 30 : 0;
+            newState.activeSabotage = {
+              type: msg.sabotageType,
+              countdown,
+              requiredFixes: msg.sabotageType === 'reactor' ? 2 : 1,
+              currentFixes: 0,
+            };
+            networkRef.current?.broadcast({
+              type: 'STATE_SYNC',
+              gameState: newState,
+            });
+            return newState;
+          }
+
+          case 'FIX_SABOTAGE': {
+            if (newState.activeSabotage && newState.activeSabotage.type === msg.sabotageType) {
+              newState.activeSabotage = null;
+              networkRef.current?.broadcast({
+                type: 'STATE_SYNC',
+                gameState: newState,
+              });
+            }
+            return newState;
+          }
+
+          case 'LOCK_DOORS': {
+            playDoorLock();
+            newState.lockedDoors = {
+              ...(newState.lockedDoors || {}),
+              [msg.room]: Date.now() + 10000,
+            };
+            networkRef.current?.broadcast({
+              type: 'STATE_SYNC',
+              gameState: newState,
+            });
+            return newState;
+          }
+
+          case 'SECURITY_CAM_TOGGLE': {
+            newState.isSecurityCamActive = msg.active;
+            networkRef.current?.broadcast({
+              type: 'STATE_SYNC',
+              gameState: newState,
+            });
             return newState;
           }
 
@@ -960,7 +1017,57 @@ function AmongUsApp() {
     };
   }, [gameState.phase, isHost, checkWinConditions]);
 
-  // Host Bot Simulation Loop during Playing Phase
+  // Host Sabotage Crisis Countdown Loop
+  useEffect(() => {
+    if (!isHost || gameState.phase !== 'playing') {
+      if (sabotageIntervalRef.current) clearInterval(sabotageIntervalRef.current);
+      return;
+    }
+
+    sabotageIntervalRef.current = setInterval(() => {
+      setGameState((prev) => {
+        if (prev.phase !== 'playing' || !prev.activeSabotage) return prev;
+
+        const currentSab = prev.activeSabotage;
+        if (currentSab.countdown <= 0 && (currentSab.type === 'reactor' || currentSab.type === 'o2')) {
+          // Sabotage timed out -> Impostors Win immediately!
+          const overState: GameState = {
+            ...prev,
+            phase: 'game_over',
+            winner: 'impostors',
+            winReason:
+              currentSab.type === 'reactor'
+                ? 'Kritische Reaktorschmelze! Die Skeld wurde zerstört.'
+                : 'Sauerstoff erschöpft! Die Besatzung konnte nicht gerettet werden.',
+            activeSabotage: null,
+          };
+          networkRef.current?.broadcast({ type: 'STATE_SYNC', gameState: overState });
+          return overState;
+        }
+
+        if (currentSab.countdown > 0) {
+          const updatedSab = {
+            ...currentSab,
+            countdown: currentSab.countdown - 1,
+          };
+          const updatedState = {
+            ...prev,
+            activeSabotage: updatedSab,
+          };
+          networkRef.current?.broadcast({ type: 'STATE_SYNC', gameState: updatedState });
+          return updatedState;
+        }
+
+        return prev;
+      });
+    }, 1000);
+
+    return () => {
+      if (sabotageIntervalRef.current) clearInterval(sabotageIntervalRef.current);
+    };
+  }, [isHost, gameState.phase]);
+
+  // Host Bot Simulation Loop (Waypoint NavMesh Pathfinding - No wall clipping!)
   useEffect(() => {
     if (!isHost || gameState.phase !== 'playing') {
       if (botIntervalRef.current) clearInterval(botIntervalRef.current);
@@ -977,13 +1084,55 @@ function AmongUsApp() {
         Object.values(updatedPlayers).forEach((p) => {
           if (p.isBot && p.isAlive && !p.inVent) {
             anyBotMoved = true;
-            // Wander smoothly
-            const dx = (Math.random() - 0.5) * 40;
-            const dy = (Math.random() - 0.5) * 40;
-            p.x = Math.max(100, Math.min(2300, p.x + dx));
-            p.y = Math.max(400, Math.min(1500, p.y + dy));
-            p.facing = dx >= 0 ? 'right' : 'left';
-            p.isMoving = true;
+
+            // Initialize or retrieve bot target waypoint path
+            let bState = botTargetState.current[p.id];
+            if (!bState || bState.path.length === 0 || bState.pathIdx >= bState.path.length) {
+              // Pick a random task station or waypoint as new target
+              const targetTask = ALL_TASKS[Math.floor(Math.random() * ALL_TASKS.length)];
+              const path = findBotPath(p.x, p.y, targetTask.x, targetTask.y);
+              bState = {
+                targetX: targetTask.x,
+                targetY: targetTask.y,
+                path,
+                pathIdx: 0,
+                pauseTicks: 0,
+              };
+              botTargetState.current[p.id] = bState;
+            }
+
+            // If bot is pausing at task to simulate doing it
+            if (bState.pauseTicks > 0) {
+              bState.pauseTicks--;
+              p.isMoving = false;
+              return;
+            }
+
+            const currentWaypoint = bState.path[bState.pathIdx];
+            if (currentWaypoint) {
+              const dx = currentWaypoint.x - p.x;
+              const dy = currentWaypoint.y - p.y;
+              const dist = Math.hypot(dx, dy);
+
+              const botSpeed = 24 * prev.settings.playerSpeed;
+
+              if (dist < botSpeed) {
+                p.x = currentWaypoint.x;
+                p.y = currentWaypoint.y;
+                bState.pathIdx++;
+
+                // If finished path, pause at destination
+                if (bState.pathIdx >= bState.path.length) {
+                  bState.pauseTicks = Math.floor(Math.random() * 8) + 4;
+                  p.isMoving = false;
+                }
+              } else {
+                p.x += (dx / dist) * botSpeed;
+                p.y += (dy / dist) * botSpeed;
+                p.facing = dx >= 0 ? 'right' : 'left';
+                p.isMoving = true;
+              }
+            }
           }
         });
 
@@ -996,14 +1145,14 @@ function AmongUsApp() {
 
         return { ...prev, players: updatedPlayers };
       });
-    }, 400);
+    }, 200);
 
     return () => {
       if (botIntervalRef.current) clearInterval(botIntervalRef.current);
     };
   }, [isHost, gameState.phase]);
 
-  // Player Actions: Move, Kill, Report, Meeting, Task, Vent
+  // Player Actions: Move, Kill, Report, Meeting, Task, Vent, Sabotage
   const handlePlayerMove = (
     x: number,
     y: number,
@@ -1162,6 +1311,38 @@ function AmongUsApp() {
     }
   };
 
+  const handleTriggerSabotage = (sabotageType: SabotageType) => {
+    if (isHost) {
+      handleHostNetworkMessage({ type: 'TRIGGER_SABOTAGE', sabotageType }, localPlayerId);
+    } else {
+      networkRef.current?.sendToHost({ type: 'TRIGGER_SABOTAGE', sabotageType });
+    }
+  };
+
+  const handleFixSabotage = (sabotageType: SabotageType) => {
+    if (isHost) {
+      handleHostNetworkMessage({ type: 'FIX_SABOTAGE', sabotageType, fixerId: localPlayerId }, localPlayerId);
+    } else {
+      networkRef.current?.sendToHost({ type: 'FIX_SABOTAGE', sabotageType, fixerId: localPlayerId });
+    }
+  };
+
+  const handleLockDoors = (room: string) => {
+    if (isHost) {
+      handleHostNetworkMessage({ type: 'LOCK_DOORS', room }, localPlayerId);
+    } else {
+      networkRef.current?.sendToHost({ type: 'LOCK_DOORS', room });
+    }
+  };
+
+  const handleSecurityCamToggle = (active: boolean) => {
+    if (isHost) {
+      handleHostNetworkMessage({ type: 'SECURITY_CAM_TOGGLE', active, viewerId: localPlayerId }, localPlayerId);
+    } else {
+      networkRef.current?.sendToHost({ type: 'SECURITY_CAM_TOGGLE', active, viewerId: localPlayerId });
+    }
+  };
+
   const handlePlayAgain = () => {
     if (!isHost) return;
     setGameState((prev) => {
@@ -1185,6 +1366,9 @@ function AmongUsApp() {
         winReason: undefined,
         totalTasksCount: 0,
         completedTasksCount: 0,
+        activeSabotage: null,
+        isSecurityCamActive: false,
+        lockedDoors: {},
       };
 
       networkRef.current?.broadcast({
@@ -1269,12 +1453,19 @@ function AmongUsApp() {
           settings={gameState.settings}
           totalTasksCount={gameState.totalTasksCount || 0}
           completedTasksCount={gameState.completedTasksCount || 0}
+          activeSabotage={gameState.activeSabotage}
+          isSecurityCamActive={gameState.isSecurityCamActive}
+          lockedDoors={gameState.lockedDoors}
           onPlayerMove={handlePlayerMove}
           onKillPlayer={handleKillPlayer}
           onReportBody={handleReportBody}
           onEmergencyMeeting={handleEmergencyMeeting}
           onCompleteTask={handleCompleteTask}
           onVentAction={handleVentAction}
+          onTriggerSabotage={handleTriggerSabotage}
+          onFixSabotage={handleFixSabotage}
+          onLockDoors={handleLockDoors}
+          onSecurityCamToggle={handleSecurityCamToggle}
         />
       ) : gameState.phase === 'meeting' ? (
         <MeetingModal

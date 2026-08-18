@@ -343,6 +343,127 @@ class SoundEngine {
       // Ignore audio error
     }
   }
+
+  public playSabotageAlarm() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.linearRampToValueAtTime(640, now + 0.25);
+      osc.frequency.linearRampToValueAtTime(320, now + 0.5);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.55);
+    } catch {
+      // Ignore audio error
+    }
+  }
+
+  public playSwitchClick() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.03);
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.03);
+    } catch {
+      // Ignore audio error
+    }
+  }
+
+  public playDoorLock() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.18);
+    } catch {
+      // Ignore audio error
+    }
+  }
+
+  public playCameraClick() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, now);
+      osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } catch {
+      // Ignore audio error
+    }
+  }
 }
 
 export const sound = new SoundEngine();
+
+export const playFootstep = () => sound.playFootstep();
+export const playTaskComplete = () => sound.playTaskComplete();
+export const playEmergencySiren = () => sound.playEmergencySiren();
+export const playKillSound = () => sound.playKillSound();
+export const playVentWhoosh = () => sound.playVentWhoosh();
+export const playButtonClick = () => sound.playButtonClick();
+export const playLaserShoot = () => sound.playLaserShoot();
+export const playSabotageAlarm = () => sound.playSabotageAlarm();
+export const playSwitchClick = () => sound.playSwitchClick();
+export const playDoorLock = () => sound.playDoorLock();
+export const playCameraClick = () => sound.playCameraClick();
