@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlayerColor, PLAYER_COLORS, HatType, KillAnimationType } from '@/types/game';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
 import { playKillSound } from '@/lib/sound';
@@ -28,9 +28,11 @@ export function KillAnimationOverlay({
   });
 
   const [frame, setFrame] = useState(0);
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
 
   useEffect(() => {
-    // Play dramatic kill sound
+    // Play dramatic kill sound once
     playKillSound();
 
     const interval = setInterval(() => {
@@ -38,23 +40,33 @@ export function KillAnimationOverlay({
     }, 40);
 
     const timeout = setTimeout(() => {
-      onFinished();
-    }, 2400);
+      onFinishedRef.current();
+    }, 2000);
+
+    const handleKey = () => {
+      onFinishedRef.current();
+    };
+    window.addEventListener('keydown', handleKey);
 
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
+      window.removeEventListener('keydown', handleKey);
     };
-  }, [onFinished]);
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center overflow-hidden select-none">
+    <div
+      onClick={() => onFinishedRef.current()}
+      className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center overflow-hidden select-none cursor-pointer"
+    >
       {/* Red Blood Screen Flash */}
       <div
         className={`absolute inset-0 bg-red-600 pointer-events-none transition-opacity duration-300 ${
           frame < 6 ? 'opacity-40' : 'opacity-0'
         }`}
       />
+
 
       {/* Cinematic Black Letterbox Bars */}
       <div className="absolute top-0 left-0 right-0 h-16 bg-black border-b border-red-900/50 shadow-2xl z-20 flex items-center justify-between px-8">

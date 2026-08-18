@@ -120,6 +120,10 @@ export function GameCanvas({
     isVictimLocal: boolean;
   } | null>(null);
 
+  const handleCloseKillOverlay = React.useCallback(() => {
+    setActiveKillOverlay(null);
+  }, []);
+
   // Position & Movement state
   const posRef = useRef({ x: localPlayer.x, y: localPlayer.y });
   const facingRef = useRef<'left' | 'right'>(localPlayer.facing);
@@ -935,7 +939,7 @@ export function GameCanvas({
           victimColor={activeKillOverlay.victimColor}
           victimHat={activeKillOverlay.victimHat}
           isVictimLocal={activeKillOverlay.isVictimLocal}
-          onFinished={() => setActiveKillOverlay(null)}
+          onFinished={handleCloseKillOverlay}
         />
       )}
     </div>
