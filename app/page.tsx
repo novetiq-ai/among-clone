@@ -24,7 +24,7 @@ import { MeetingModal } from '@/components/game/MeetingModal';
 import { EjectionScreen } from '@/components/game/EjectionScreen';
 import { GameOverModal } from '@/components/game/GameOverModal';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
-import { SabotageType, ActiveSabotage } from '@/types/game';
+import { SabotageType, ActiveSabotage, HatType, HATS } from '@/types/game';
 
 function AmongUsApp() {
   const searchParams = useSearchParams();
@@ -186,6 +186,7 @@ function AmongUsApp() {
                 ...newState.players[senderId],
                 ...(msg.name ? { name: msg.name } : {}),
                 ...(msg.color ? { color: msg.color } : {}),
+                ...(msg.hat !== undefined ? { hat: msg.hat } : {}),
                 ...(msg.isReady !== undefined ? { isReady: msg.isReady } : {}),
               };
 
@@ -638,13 +639,14 @@ function AmongUsApp() {
   };
 
   // Update profile in Lobby
-  const handleUpdateProfile = (name: string, color: PlayerColor, isReady: boolean) => {
+  const handleUpdateProfile = (name: string, color: PlayerColor, isReady: boolean, hat?: HatType) => {
     if (isHost) {
       setGameState((prev) => {
         const updatedHost = {
           ...prev.players[localPlayerId],
           name,
           color,
+          hat: hat ?? prev.players[localPlayerId]?.hat ?? 'none',
           isReady: true,
         };
         const newState = {
@@ -662,15 +664,17 @@ function AmongUsApp() {
         return newState;
       });
     } else {
-      setLocalPlayer((prev) => ({ ...prev, name, color, isReady }));
+      setLocalPlayer((prev) => ({ ...prev, name, color, isReady, hat: hat ?? prev.hat ?? 'none' }));
       networkRef.current?.sendToHost({
         type: 'PLAYER_UPDATE_PROFILE',
         name,
         color,
+        hat,
         isReady,
       });
     }
   };
+
 
   // Update Game Settings (Host only)
   const handleUpdateSettings = (newSettings: Partial<GameSettings>) => {
@@ -733,12 +737,14 @@ function AmongUsApp() {
       for (let i = 0; i < neededBots; i++) {
         const botId = `bot-${i + 1}`;
         const botColor = availableColors[i] || 'yellow';
-        const botNames = ['Blauhelm', 'Sternenpilot', 'AstroBot', 'Orion', 'Nova', 'Pulsar'];
+        const botNames = ['Blauhelm', 'Sternenpilot', 'AstroBot', 'Orion', 'Nova', 'Pulsar', 'Cosmo', 'Orbit'];
         const spawnPos = getSpawnPosition(currentCount + i);
+        const randomHat = HATS[Math.floor(Math.random() * HATS.length)].id;
         playersMap[botId] = {
           id: botId,
           name: botNames[i % botNames.length] || `Bot ${i + 1}`,
           color: botColor,
+          hat: randomHat,
           isHost: false,
           isReady: true,
           role: 'unassigned',
@@ -1424,7 +1430,7 @@ function AmongUsApp() {
         // Cinematic Role Reveal Screen
         <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in zoom-in-95 duration-500">
           <div className="mb-6 transform scale-150">
-            <AstronautAvatar color={localPlayer.color} size={90} />
+            <AstronautAvatar color={localPlayer.color} hat={localPlayer.hat || 'none'} size={90} />
           </div>
           <h2 className="text-xl font-mono text-slate-400 uppercase tracking-widest mb-2 animate-pulse">
             SHHHHH!

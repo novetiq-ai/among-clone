@@ -9,6 +9,8 @@ import {
   VentDefinition,
   ActiveSabotage,
   SabotageType,
+  PlayerColor,
+  HatType,
 } from '@/types/game';
 import {
   ALL_TASKS,
@@ -26,6 +28,7 @@ import { SkeldMinimapModal } from './SkeldMinimapModal';
 import { CCTVModal } from './CCTVModal';
 import { AdminTableModal } from './AdminTableModal';
 import { SabotageModal } from './SabotageModal';
+import { KillAnimationOverlay } from './KillAnimationOverlay';
 import { sound, playSabotageAlarm } from '@/lib/sound';
 import {
   Skull,
@@ -109,12 +112,36 @@ export function GameCanvas({
   const [controlMode, setControlMode] = useState<'joystick' | 'dpad' | 'none'>('joystick');
   const [isMuted, setIsMuted] = useState(sound.getMuted());
 
+  const [activeKillOverlay, setActiveKillOverlay] = useState<{
+    killerColor: PlayerColor;
+    killerHat?: HatType;
+    victimColor: PlayerColor;
+    victimHat?: HatType;
+    isVictimLocal: boolean;
+  } | null>(null);
+
   // Position & Movement state
   const posRef = useRef({ x: localPlayer.x, y: localPlayer.y });
   const facingRef = useRef<'left' | 'right'>(localPlayer.facing);
   const keysPressed = useRef<Record<string, boolean>>({});
   const joystickVectorRef = useRef<{ dx: number; dy: number; isMoving: boolean }>({ dx: 0, dy: 0, isMoving: false });
   const lastSyncTime = useRef<number>(0);
+  const prevAliveRef = useRef(localPlayer.isAlive);
+
+  // Detect if local player was killed
+  useEffect(() => {
+    if (prevAliveRef.current && !localPlayer.isAlive) {
+      const killer = Object.values(players).find((p) => p.role === 'impostor');
+      setActiveKillOverlay({
+        killerColor: killer?.color || 'red',
+        killerHat: killer?.hat || 'none',
+        victimColor: localPlayer.color,
+        victimHat: localPlayer.hat || 'none',
+        isVictimLocal: true,
+      });
+    }
+    prevAliveRef.current = localPlayer.isAlive;
+  }, [localPlayer.isAlive, localPlayer.color, localPlayer.hat, players]);
 
   // Cooldown timers
   const [killCooldown, setKillCooldown] = useState(settings.killCooldown);
@@ -153,9 +180,17 @@ export function GameCanvas({
   // Kill Action
   const handleKill = () => {
     if (!nearbyKillTarget || killCooldown > 0 || !localPlayer.isAlive || localPlayer.role !== 'impostor') return;
+    setActiveKillOverlay({
+      killerColor: localPlayer.color,
+      killerHat: localPlayer.hat || 'none',
+      victimColor: nearbyKillTarget.color,
+      victimHat: nearbyKillTarget.hat || 'none',
+      isVictimLocal: false,
+    });
     onKillPlayer(nearbyKillTarget.id, nearbyKillTarget.x, nearbyKillTarget.y);
     setKillCooldown(settings.killCooldown);
   };
+
 
   // Vent Action
   const handleVentToggle = () => {
@@ -891,7 +926,20 @@ export function GameCanvas({
           onClose={() => setActiveTask(null)}
         />
       )}
+
+      {/* Fullscreen Cinematic Kill Animation */}
+      {activeKillOverlay && (
+        <KillAnimationOverlay
+          killerColor={activeKillOverlay.killerColor}
+          killerHat={activeKillOverlay.killerHat}
+          victimColor={activeKillOverlay.victimColor}
+          victimHat={activeKillOverlay.victimHat}
+          isVictimLocal={activeKillOverlay.isVictimLocal}
+          onFinished={() => setActiveKillOverlay(null)}
+        />
+      )}
     </div>
   );
 }
+
 

@@ -62,7 +62,7 @@ export function GameOverModal({
           <div className="flex justify-center items-center gap-4 flex-wrap">
             {impostorList.map((imp) => (
               <div key={imp.id} className="flex flex-col items-center">
-                <AstronautAvatar color={imp.color} size={48} />
+                <AstronautAvatar color={imp.color} hat={imp.hat || 'none'} size={48} />
                 <span className="text-xs font-bold text-red-400 mt-1">{imp.name}</span>
               </div>
             ))}

@@ -1,5 +1,5 @@
 import { ROOMS, CORRIDORS, WALLS, ALL_TASKS, VENTS, EMERGENCY_BUTTON_POS, SECURITY_CAMERAS } from '@/lib/map-data';
-import { Player, DeadBody, PLAYER_COLORS, ActiveSabotage } from '@/types/game';
+import { Player, DeadBody, PLAYER_COLORS, ActiveSabotage, HatType } from '@/types/game';
 
 // Helper for rendering glowing circular items
 function drawGlowCircle(
@@ -1435,6 +1435,9 @@ function drawPlayers(
       ctx.beginPath();
       ctx.roundRect(5, -14, 11, 4, 2);
       ctx.fill();
+
+      // Custom Hat on Player Head
+      drawPlayerCanvasHat(ctx, p.hat, isGhost);
     } else {
       // ----------------------------------------------------
       // GHOST CREWMATE (Translucent wavy ghost bean)
@@ -1463,6 +1466,7 @@ function drawPlayers(
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+
 
     // ----------------------------------------------------
     // Player Name Tag & Impostor Recognition
@@ -1500,8 +1504,233 @@ function drawPlayers(
   }
 }
 
+// ----------------------------------------------------
+// Draw 2D Canvas Hats on Players
+// ----------------------------------------------------
+function drawPlayerCanvasHat(ctx: CanvasRenderingContext2D, hat?: HatType, isGhost?: boolean) {
+  if (!hat || hat === 'none' || isGhost) return;
+
+  ctx.save();
+  switch (hat) {
+    case 'tophat':
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.ellipse(2, -26, 14, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-6, -42, 16, 16);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(-6, -30, 16, 4);
+      break;
+    case 'crown':
+      ctx.fillStyle = '#fbbf24';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-10, -26);
+      ctx.lineTo(-12, -38);
+      ctx.lineTo(-4, -30);
+      ctx.lineTo(2, -42);
+      ctx.lineTo(8, -30);
+      ctx.lineTo(16, -38);
+      ctx.lineTo(14, -26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    case 'sprout':
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(2, -26);
+      ctx.quadraticCurveTo(4, -36, 2, -42);
+      ctx.stroke();
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.ellipse(-3, -42, 6, 3, -0.5, 0, Math.PI * 2);
+      ctx.ellipse(7, -40, 6, 3, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'party':
+      ctx.fillStyle = '#ec4899';
+      ctx.beginPath();
+      ctx.moveTo(-8, -26);
+      ctx.lineTo(2, -48);
+      ctx.lineTo(12, -26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(2, -48, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'knife':
+      ctx.fillStyle = '#cbd5e1';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.fillRect(-18, -28, 28, 5);
+      ctx.strokeRect(-18, -28, 28, 5);
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(10, -29, 8, 7);
+      break;
+    case 'dum':
+      ctx.fillStyle = '#fef08a';
+      ctx.strokeStyle = '#ca8a04';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(0, -22, 16, 12);
+      ctx.strokeRect(0, -22, 16, 12);
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 7px sans-serif';
+      ctx.fillText('DUM', 8, -13);
+      break;
+    case 'devil':
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(-8, -26);
+      ctx.lineTo(-14, -38);
+      ctx.lineTo(-2, -30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(8, -26);
+      ctx.lineTo(14, -38);
+      ctx.lineTo(2, -30);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'halo':
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(2, -36, 14, 5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    case 'goggles':
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-6, -26, 20, 6);
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(-1, -23, 4, 0, Math.PI * 2);
+      ctx.arc(9, -23, 4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'viking':
+      ctx.fillStyle = '#64748b';
+      ctx.beginPath();
+      ctx.arc(2, -26, 12, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.moveTo(-10, -26);
+      ctx.lineTo(-18, -38);
+      ctx.lineTo(-6, -30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(14, -26);
+      ctx.lineTo(22, -38);
+      ctx.lineTo(10, -30);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'beanie':
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.arc(2, -26, 12, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(2, -38, 4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'cap':
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.arc(2, -26, 12, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(-12, -28, 8, 3);
+      break;
+    case 'egg':
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(2, -26, 12, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(2, -28, 4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'cheese':
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(-8, -26);
+      ctx.lineTo(12, -26);
+      ctx.lineTo(4, -38);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'cat':
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.moveTo(-8, -26);
+      ctx.lineTo(-10, -36);
+      ctx.lineTo(-2, -30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(8, -26);
+      ctx.lineTo(10, -36);
+      ctx.lineTo(2, -30);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'plague':
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-6, -28, 16, 6);
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.moveTo(8, -22);
+      ctx.lineTo(22, -14);
+      ctx.lineTo(8, -16);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'straw':
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.ellipse(2, -26, 16, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-4, -34, 12, 8);
+      break;
+    case 'cowboy':
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.ellipse(2, -26, 18, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-4, -36, 12, 10);
+      break;
+    case 'santa':
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(-8, -26);
+      ctx.lineTo(8, -38);
+      ctx.lineTo(14, -26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-8, -28, 22, 4);
+      ctx.beginPath();
+      ctx.arc(10, -38, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
 // Ship Walls & Structural Bulkheads (Solid barrier blocks)
 function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
+
   for (const wall of WALLS) {
     // 1. Wall Drop Shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';

@@ -172,7 +172,7 @@ export function MeetingModal({
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="relative shrink-0">
-                        <AstronautAvatar color={p.color} size={36} />
+                        <AstronautAvatar color={p.color} hat={p.hat || 'none'} size={36} />
                         {isDead && (
                           <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full">
                             <X className="w-5 h-5 text-red-500 stroke-[3]" />

@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { PlayerColor, PLAYER_COLORS } from '@/types/game';
+import { PlayerColor, PLAYER_COLORS, HatType } from '@/types/game';
 
 interface AstronautAvatarProps {
   color: PlayerColor;
+  hat?: HatType;
   size?: number;
   facing?: 'left' | 'right';
   isDead?: boolean;
@@ -17,6 +18,7 @@ interface AstronautAvatarProps {
 
 export function AstronautAvatar({
   color,
+  hat = 'none',
   size = 64,
   facing = 'right',
   isDead = false,
@@ -28,15 +30,170 @@ export function AstronautAvatar({
 }: AstronautAvatarProps) {
   const colorInfo = PLAYER_COLORS.find((c) => c.id === color) || PLAYER_COLORS[0];
 
+  const renderHat = () => {
+    if (isDead) return null;
+    const activeHat = hat === 'none' && isHost ? 'crown' : hat;
+    if (!activeHat || activeHat === 'none') return null;
+
+    switch (activeHat) {
+      case 'tophat':
+        return (
+          <g>
+            <ellipse cx="60" cy="18" rx="22" ry="6" fill="#1e293b" stroke="#0f172a" strokeWidth="4" />
+            <path d="M46 18 L48 -14 L72 -14 L74 18 Z" fill="#1e293b" stroke="#0f172a" strokeWidth="4" />
+            <rect x="47" y="10" width="26" height="6" fill="#ef4444" />
+            <ellipse cx="60" cy="-14" rx="12" ry="3" fill="#334155" />
+          </g>
+        );
+      case 'crown':
+        return (
+          <g>
+            <path d="M42 16 L38 -4 L50 6 L60 -10 L70 6 L82 -4 L78 16 Z" fill="#fbbf24" stroke="#0f172a" strokeWidth="4" strokeLinejoin="round" />
+            <circle cx="38" cy="-4" r="3" fill="#ef4444" />
+            <circle cx="60" cy="-10" r="4" fill="#3b82f6" />
+            <circle cx="82" cy="-4" r="3" fill="#10b981" />
+          </g>
+        );
+      case 'sprout':
+        return (
+          <g>
+            <path d="M60 16 C60 0 62 -10 60 -18" stroke="#16a34a" strokeWidth="4" fill="none" strokeLinecap="round" />
+            <path d="M60 -18 C50 -26 40 -16 60 -12 Z" fill="#22c55e" stroke="#16a34a" strokeWidth="3" />
+            <path d="M60 -16 C70 -26 80 -16 60 -10 Z" fill="#4ade80" stroke="#16a34a" strokeWidth="3" />
+          </g>
+        );
+      case 'party':
+        return (
+          <g>
+            <path d="M44 16 L60 -20 L76 16 Z" fill="#ec4899" stroke="#0f172a" strokeWidth="4" strokeLinejoin="round" />
+            <circle cx="60" cy="-22" r="5" fill="#fbbf24" />
+            <path d="M48 6 L72 6" stroke="#38bdf8" strokeWidth="3" />
+            <path d="M52 -4 L68 -4" stroke="#a855f7" strokeWidth="3" />
+          </g>
+        );
+      case 'knife':
+        return (
+          <g>
+            <path d="M22 6 L68 12 L70 18 L22 10 Z" fill="#94a3b8" stroke="#0f172a" strokeWidth="3" />
+            <rect x="70" y="8" width="16" height="8" rx="2" fill="#78350f" stroke="#0f172a" strokeWidth="3" />
+            <circle cx="68" cy="14" r="4" fill="#ef4444" />
+          </g>
+        );
+      case 'dum':
+        return (
+          <g transform="rotate(-12 60 22)">
+            <rect x="46" y="16" width="30" height="24" rx="2" fill="#fef08a" stroke="#ca8a04" strokeWidth="2" />
+            <text x="61" y="32" fill="#000000" fontSize="11" fontWeight="900" fontFamily="sans-serif" textAnchor="middle">DUM</text>
+          </g>
+        );
+      case 'devil':
+        return (
+          <g>
+            <path d="M44 16 C40 8 36 -2 32 -10 C42 -6 48 4 50 16 Z" fill="#dc2626" stroke="#0f172a" strokeWidth="3" />
+            <path d="M76 16 C80 8 84 -2 88 -10 C78 -6 72 4 70 16 Z" fill="#dc2626" stroke="#0f172a" strokeWidth="3" />
+          </g>
+        );
+      case 'halo':
+        return (
+          <g>
+            <ellipse cx="60" cy="-6" rx="22" ry="7" fill="none" stroke="#fde047" strokeWidth="5" />
+            <ellipse cx="60" cy="-6" rx="22" ry="7" fill="none" stroke="#ffffff" strokeWidth="2" opacity="0.8" />
+          </g>
+        );
+      case 'goggles':
+        return (
+          <g>
+            <rect x="42" y="10" width="36" height="10" rx="3" fill="#1e293b" stroke="#0f172a" strokeWidth="3" />
+            <ellipse cx="52" cy="15" rx="7" ry="6" fill="#38bdf8" stroke="#ca8a04" strokeWidth="2.5" />
+            <ellipse cx="68" cy="15" rx="7" ry="6" fill="#38bdf8" stroke="#ca8a04" strokeWidth="2.5" />
+          </g>
+        );
+      case 'viking':
+        return (
+          <g>
+            <path d="M40 18 C40 4 80 4 80 18 Z" fill="#64748b" stroke="#0f172a" strokeWidth="4" />
+            <path d="M40 12 C30 6 22 -6 20 -14 C28 -8 34 2 40 8 Z" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
+            <path d="M80 12 C90 6 98 -6 100 -14 C92 -8 86 2 80 8 Z" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
+          </g>
+        );
+      case 'cap':
+        return (
+          <g>
+            <path d="M42 18 C42 6 78 6 78 18 Z" fill="#dc2626" stroke="#0f172a" strokeWidth="4" />
+            <path d="M30 18 C30 18 42 16 46 18 Z" fill="#b91c1c" stroke="#0f172a" strokeWidth="3" />
+          </g>
+        );
+      case 'beanie':
+        return (
+          <g>
+            <path d="M42 18 C42 0 78 0 78 18 Z" fill="#0284c7" stroke="#0f172a" strokeWidth="4" />
+            <circle cx="60" cy="-2" r="5" fill="#ffffff" stroke="#0f172a" strokeWidth="3" />
+            <rect x="40" y="14" width="40" height="6" rx="2" fill="#0369a1" stroke="#0f172a" strokeWidth="3" />
+          </g>
+        );
+      case 'egg':
+        return (
+          <g>
+            <path d="M38 16 C38 10 46 8 56 6 C68 4 84 8 82 16 C80 20 68 18 58 18 C48 18 38 20 38 16 Z" fill="#ffffff" stroke="#0f172a" strokeWidth="3" />
+            <ellipse cx="60" cy="11" rx="8" ry="6" fill="#f59e0b" stroke="#d97706" strokeWidth="2" />
+          </g>
+        );
+      case 'cheese':
+        return (
+          <g>
+            <polygon points="42,16 78,16 66,-4" fill="#fbbf24" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+            <circle cx="56" cy="10" r="3" fill="#d97706" />
+            <circle cx="66" cy="8" r="2.5" fill="#d97706" />
+            <circle cx="62" cy="1" r="2" fill="#d97706" />
+          </g>
+        );
+      case 'cat':
+        return (
+          <g>
+            <polygon points="42,16 40,-2 52,10" fill="#1e293b" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+            <polygon points="43,14 42,2 50,10" fill="#f472b6" />
+            <polygon points="78,16 80,-2 68,10" fill="#1e293b" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" />
+            <polygon points="77,14 78,2 70,10" fill="#f472b6" />
+          </g>
+        );
+      case 'plague':
+        return (
+          <g>
+            <path d="M42 16 C42 4 78 4 78 16 Z" fill="#1e293b" stroke="#0f172a" strokeWidth="3" />
+            <path d="M72 24 C86 24 96 32 94 40 C84 34 76 30 72 26 Z" fill="#f8fafc" stroke="#0f172a" strokeWidth="3" />
+            <circle cx="68" cy="22" r="4" fill="#0f172a" />
+          </g>
+        );
+      case 'straw':
+        return (
+          <g>
+            <ellipse cx="60" cy="18" rx="26" ry="6" fill="#fde047" stroke="#0f172a" strokeWidth="3" />
+            <path d="M46 18 C46 6 74 6 74 18 Z" fill="#fef08a" stroke="#0f172a" strokeWidth="3" />
+            <rect x="47" y="13" width="26" height="4" fill="#0284c7" />
+          </g>
+        );
+      case 'cowboy':
+        return (
+          <g>
+            <path d="M34 18 C34 18 42 12 60 14 C78 12 86 18 86 18 C86 18 78 15 60 16 C42 15 34 18 34 18 Z" fill="#78350f" stroke="#0f172a" strokeWidth="4" />
+            <path d="M46 16 C46 2 54 4 60 2 C66 4 74 2 74 16 Z" fill="#92400e" stroke="#0f172a" strokeWidth="4" />
+          </g>
+        );
+      case 'santa':
+        return (
+          <g>
+            <path d="M42 18 C44 2 76 0 86 16 Z" fill="#dc2626" stroke="#0f172a" strokeWidth="4" />
+            <circle cx="90" cy="18" r="6" fill="#ffffff" stroke="#0f172a" strokeWidth="3" />
+            <rect x="40" y="14" width="42" height="7" rx="3.5" fill="#ffffff" stroke="#0f172a" strokeWidth="3" />
+          </g>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className={`flex flex-col items-center justify-center ${className}`}>
-      {/* Crown / Host Indicator */}
-      {isHost && (
-        <div className="text-amber-400 mb-1 text-sm font-black flex items-center gap-1 drop-shadow-md animate-bounce">
-          👑
-        </div>
-      )}
-
       {/* Character Graphic */}
       <div
         className="relative transition-transform select-none"
@@ -168,6 +325,9 @@ export function AstronautAvatar({
                 fill="#ffffff"
                 opacity="0.85"
               />
+
+              {/* Headwear / Custom Hat */}
+              {renderHat()}
             </g>
           )}
         </svg>
@@ -195,3 +355,4 @@ export function AstronautAvatar({
     </div>
   );
 }
+

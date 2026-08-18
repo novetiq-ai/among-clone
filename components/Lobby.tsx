@@ -7,6 +7,8 @@ import {
   PLAYER_COLORS,
   GameSettings,
   ChatMessage,
+  HatType,
+  HATS,
 } from '@/types/game';
 import { AstronautAvatar } from './AstronautAvatar';
 import {
@@ -19,6 +21,7 @@ import {
   LogOut,
   Sparkles,
   Info,
+  Laptop,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -29,7 +32,7 @@ interface LobbyProps {
   players: Record<string, Player>;
   settings: GameSettings;
   chatMessages: ChatMessage[];
-  onUpdateProfile: (name: string, color: PlayerColor, isReady: boolean) => void;
+  onUpdateProfile: (name: string, color: PlayerColor, isReady: boolean, hat?: HatType) => void;
   onUpdateSettings: (newSettings: Partial<GameSettings>) => void;
   onSendMessage: (text: string) => void;
   onStartGame: () => void;
@@ -54,6 +57,7 @@ export function Lobby({
   const [chatInput, setChatInput] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'crew' | 'chat'>('crew');
+  const [customizeTab, setCustomizeTab] = useState<'color' | 'hat'>('color');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const playerList = Object.values(players);
@@ -148,7 +152,7 @@ export function Lobby({
           <div className="bg-slate-900/90 border-2 border-blue-500/30 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="text-xs font-bold font-mono uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" /> Mein Astronaut
+                <Laptop className="w-4 h-4 text-cyan-400" /> Astronaut & Laptop
               </span>
               <span className="text-[10px] text-slate-400 font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
                 {localPlayer.isHost ? '👑 HOST' : localPlayer.isReady ? '✅ BEREIT' : '⏳ WARTET'}
@@ -159,6 +163,7 @@ export function Lobby({
             <div className="flex flex-col items-center justify-center py-4 bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
               <AstronautAvatar
                 color={localPlayer.color}
+                hat={localPlayer.hat || 'none'}
                 size={80}
                 name={localPlayer.name}
                 isHost={localPlayer.isHost}
@@ -175,50 +180,107 @@ export function Lobby({
                 maxLength={12}
                 value={localPlayer.name}
                 onChange={(e) =>
-                  onUpdateProfile(e.target.value || 'Crewmate', localPlayer.color, localPlayer.isReady)
+                  onUpdateProfile(e.target.value || 'Crewmate', localPlayer.color, localPlayer.isReady, localPlayer.hat)
                 }
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
               />
             </div>
 
-            {/* Color Selector Grid */}
-            <div>
-              <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wide block mb-1.5">
-                Farbe
-              </label>
-              <div className="grid grid-cols-6 gap-2">
-                {PLAYER_COLORS.map((col) => {
-                  const isTaken = takenColors.includes(col.id);
-                  const isSelected = localPlayer.color === col.id;
-                  return (
-                    <button
-                      key={col.id}
-                      type="button"
-                      disabled={isTaken}
-                      onClick={() => onUpdateProfile(localPlayer.name, col.id, localPlayer.isReady)}
-                      title={`${col.name} ${isTaken ? '(Bereits belegt)' : ''}`}
-                      className={`relative w-8 h-8 rounded-full transition-all flex items-center justify-center cursor-pointer ${
-                        isSelected
-                          ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 shadow-lg'
-                          : isTaken
-                          ? 'opacity-20 cursor-not-allowed grayscale'
-                          : 'hover:scale-105 border border-black/40'
-                      }`}
-                      style={{ backgroundColor: col.hex }}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3] drop-shadow" />}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Sub-tabs: Color vs Hats */}
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setCustomizeTab('color')}
+                className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                  customizeTab === 'color'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🎨 Farben
+              </button>
+              <button
+                type="button"
+                onClick={() => setCustomizeTab('hat')}
+                className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                  customizeTab === 'hat'
+                    ? 'bg-amber-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🎩 Hüte ({HATS.length})
+              </button>
             </div>
+
+            {/* Color Selector Grid */}
+            {customizeTab === 'color' && (
+              <div>
+                <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wide block mb-1.5">
+                  Farbe wählen
+                </label>
+                <div className="grid grid-cols-6 gap-2">
+                  {PLAYER_COLORS.map((col) => {
+                    const isTaken = takenColors.includes(col.id);
+                    const isSelected = localPlayer.color === col.id;
+                    return (
+                      <button
+                        key={col.id}
+                        type="button"
+                        disabled={isTaken}
+                        onClick={() => onUpdateProfile(localPlayer.name, col.id, localPlayer.isReady, localPlayer.hat)}
+                        title={`${col.name} ${isTaken ? '(Bereits belegt)' : ''}`}
+                        className={`relative w-8 h-8 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+                          isSelected
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 shadow-lg'
+                            : isTaken
+                            ? 'opacity-20 cursor-not-allowed grayscale'
+                            : 'hover:scale-105 border border-black/40'
+                        }`}
+                        style={{ backgroundColor: col.hex }}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3] drop-shadow" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Hats Selector Grid */}
+            {customizeTab === 'hat' && (
+              <div className="max-h-40 overflow-y-auto pr-1">
+                <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wide block mb-1.5">
+                  Hut aufsetzen
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {HATS.map((h) => {
+                    const isSelected = (localPlayer.hat || 'none') === h.id;
+                    return (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => onUpdateProfile(localPlayer.name, localPlayer.color, localPlayer.isReady, h.id)}
+                        className={`p-2 rounded-xl border flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-600/30 border-amber-400 text-amber-300 ring-2 ring-amber-400 scale-105'
+                            : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <span className="text-xl">{h.emoji}</span>
+                        <span className="text-[9px] font-mono font-bold truncate w-full mt-0.5">{h.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Ready State Toggle for Clients */}
             {!isHost && (
               <button
                 type="button"
                 onClick={() =>
-                  onUpdateProfile(localPlayer.name, localPlayer.color, !localPlayer.isReady)
+                  onUpdateProfile(localPlayer.name, localPlayer.color, !localPlayer.isReady, localPlayer.hat)
                 }
                 className={`w-full py-3 rounded-xl font-bold uppercase tracking-wider text-xs font-mono transition-all shadow-lg active:scale-98 cursor-pointer ${
                   localPlayer.isReady
@@ -230,6 +292,7 @@ export function Lobby({
               </button>
             )}
           </div>
+
 
           {/* Quick Settings Snapshot */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
@@ -323,6 +386,7 @@ export function Lobby({
                     >
                       <AstronautAvatar
                         color={player.color}
+                        hat={player.hat || 'none'}
                         size={64}
                         isHost={player.isHost}
                         name={player.name}

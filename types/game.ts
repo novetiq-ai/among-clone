@@ -67,10 +67,64 @@ export interface TaskDefinition {
   duration?: number;
 }
 
+export type HatType =
+  | 'none'
+  | 'tophat'
+  | 'crown'
+  | 'sprout'
+  | 'party'
+  | 'knife'
+  | 'dum'
+  | 'devil'
+  | 'halo'
+  | 'goggles'
+  | 'viking'
+  | 'cap'
+  | 'beanie'
+  | 'egg'
+  | 'cheese'
+  | 'cat'
+  | 'plague'
+  | 'straw'
+  | 'cowboy'
+  | 'santa';
+
+export interface HatInfo {
+  id: HatType;
+  name: string;
+  emoji: string;
+}
+
+export const HATS: HatInfo[] = [
+  { id: 'none', name: 'Kein Hut', emoji: '🚫' },
+  { id: 'tophat', name: 'Zylinder', emoji: '🎩' },
+  { id: 'crown', name: 'Krone', emoji: '👑' },
+  { id: 'sprout', name: 'Pflänzchen', emoji: '🌱' },
+  { id: 'party', name: 'Partyhut', emoji: '🥳' },
+  { id: 'knife', name: 'Messer im Kopf', emoji: '🔪' },
+  { id: 'dum', name: 'DUM Zettel', emoji: '🏷️' },
+  { id: 'devil', name: 'Teufelshörner', emoji: '😈' },
+  { id: 'halo', name: 'Heiligenschein', emoji: '😇' },
+  { id: 'goggles', name: 'Fliegerbrille', emoji: '🤿' },
+  { id: 'viking', name: 'Wikingerhelm', emoji: '🦹' },
+  { id: 'cap', name: 'Baseball-Cap', emoji: '🧢' },
+  { id: 'beanie', name: 'Strickmütze', emoji: '🧶' },
+  { id: 'egg', name: 'Spiegelei', emoji: '🍳' },
+  { id: 'cheese', name: 'Käseecke', emoji: '🧀' },
+  { id: 'cat', name: 'Katzenohren', emoji: '🐱' },
+  { id: 'plague', name: 'Pestmaske', emoji: '🎭' },
+  { id: 'straw', name: 'Strohhut', emoji: '👒' },
+  { id: 'cowboy', name: 'Cowboyhut', emoji: '🤠' },
+  { id: 'santa', name: 'Weihnachtsmütze', emoji: '🎅' },
+];
+
+export type KillAnimationType = 'tongue' | 'gun' | 'knife' | 'neck_snap';
+
 export interface Player {
   id: string;
   name: string;
   color: PlayerColor;
+  hat?: HatType;
   isHost: boolean;
   isReady: boolean;
   role: PlayerRole;
@@ -94,10 +148,12 @@ export interface DeadBody {
   playerId: string;
   playerName: string;
   color: PlayerColor;
+  hat?: HatType;
   x: number;
   y: number;
   reported: boolean;
 }
+
 
 export interface VentDefinition {
   id: string;
@@ -205,7 +261,7 @@ export type NetworkMessage =
   | { type: 'JOIN_REJECTED'; reason: string }
   | { type: 'PLAYER_JOINED'; player: Player }
   | { type: 'PLAYER_LEFT'; playerId: string }
-  | { type: 'PLAYER_UPDATE_PROFILE'; name?: string; color?: PlayerColor; isReady?: boolean }
+  | { type: 'PLAYER_UPDATE_PROFILE'; name?: string; color?: PlayerColor; hat?: HatType; isReady?: boolean }
   | { type: 'UPDATE_SETTINGS'; settings: Partial<GameSettings> }
   | { type: 'CHAT_MESSAGE'; message: ChatMessage }
   | { type: 'STATE_SYNC'; gameState: GameState }
