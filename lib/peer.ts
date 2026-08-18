@@ -1,9 +1,12 @@
 'use client';
 
-import type { Peer as PeerType, DataConnection } from 'peerjs';
+import { createClient, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { GameState, NetworkMessage, PlayerColor, Player } from '@/types/game';
 
-export const ROOM_PREFIX = 'amongus2d-v1-';
+// Ultra-fast European Supabase Realtime Relay (Frankfurt eu-central-1)
+const SUPABASE_URL = 'https://cvjepqxttefdciuptdhp.supabase.co';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2amVwcXh0dGVmZGNpdXB0ZGhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NDcxMjUsImV4cCI6MjEwMjIyMzEyNX0.6v77Tw5-cK_Z2kd5HmdowFu-gOgPsm7PfR-OGO90z0I';
 
 export function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid easily confused characters (0/O, 1/I)
@@ -14,68 +17,109 @@ export function generateRoomCode(): string {
   return code;
 }
 
-export function formatRoomId(code: string): string {
-  return `${ROOM_PREFIX}${code.trim().toUpperCase()}`;
-}
-
-export const PEER_ICE_CONFIG = {
-  debug: 1,
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
-    ],
-  },
-};
-
 export type NetworkEventHandler = (message: NetworkMessage, senderId: string) => void;
 
+interface BroadcastPayload {
+  senderId: string;
+  recipientId?: string | 'host' | 'all';
+  message: NetworkMessage;
+}
+
 export class NetworkManager {
-  private peer: PeerType | null = null;
+  private supabase: SupabaseClient | null = null;
+  private channel: RealtimeChannel | null = null;
   private isHost: boolean = false;
   private localPlayerId: string = '';
   private roomCode: string = '';
-  
-  // Host stores all client connections
-  private connections: Map<string, DataConnection> = new Map();
-  // Client stores connection to host
-  private hostConnection: DataConnection | null = null;
+  private hostId: string = '';
 
   private messageHandlers: Set<NetworkEventHandler> = new Set();
   private disconnectHandlers: Set<(peerId: string) => void> = new Set();
   private connectHandlers: Set<(peerId: string) => void> = new Set();
 
+  private getClient(): SupabaseClient {
+    if (!this.supabase) {
+      this.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        realtime: {
+          params: {
+            eventsPerSecond: 40,
+          },
+        },
+      });
+    }
+    return this.supabase;
+  }
+
   public async initHost(roomCode: string): Promise<string> {
     this.isHost = true;
     this.roomCode = roomCode.toUpperCase();
-    const peerId = formatRoomId(this.roomCode);
+    this.localPlayerId = 'host_' + Math.random().toString(36).substring(2, 9);
+    this.hostId = this.localPlayerId;
 
-    // Dynamic import to avoid SSR errors
-    const { default: Peer } = await import('peerjs');
+    const supabase = this.getClient();
+    const channelName = `skeld_room_${this.roomCode}`;
 
     return new Promise((resolve, reject) => {
-      // Create Peer with designated ID & STUN NAT traversal
-      const peer = new Peer(peerId, PEER_ICE_CONFIG);
-
-      peer.on('open', (id) => {
-        this.peer = peer;
-        this.localPlayerId = id;
-        resolve(id);
+      const channel = supabase.channel(channelName, {
+        config: {
+          broadcast: { ack: false, self: false },
+          presence: { key: this.localPlayerId },
+        },
       });
 
-      peer.on('connection', (conn) => {
-        this.handleIncomingConnection(conn);
+      this.channel = channel;
+
+      // Handle broadcast messages
+      channel.on('broadcast', { event: 'msg' }, ({ payload }) => {
+        const data = payload as BroadcastPayload;
+        if (!data || !data.message) return;
+
+        // If message is directed to specific recipient
+        if (
+          data.recipientId &&
+          data.recipientId !== 'all' &&
+          data.recipientId !== 'host' &&
+          data.recipientId !== this.localPlayerId
+        ) {
+          return;
+        }
+
+        this.notifyMessageHandlers(data.message, data.senderId);
       });
 
-      peer.on('error', (err: any) => {
-        console.error('PeerJS Host Error:', err);
-        if (err.type === 'unavailable-id') {
-          reject(new Error(`Raum-Code "${roomCode}" ist bereits vergeben. Bitte versuche einen anderen.`));
-        } else {
-          reject(err);
+      // Presence tracking
+      channel.on('presence', { event: 'leave' }, ({ key }) => {
+        if (key && key !== this.localPlayerId) {
+          this.notifyDisconnectHandlers(key);
+        }
+      });
+
+      channel.on('presence', { event: 'join' }, ({ key }) => {
+        if (key && key !== this.localPlayerId) {
+          this.notifyConnectHandlers(key);
+        }
+      });
+
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Konnte Host-Raum nicht initialisieren (Timeout).'));
+      }, 10000);
+
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(timeoutId);
+          try {
+            await channel.track({
+              isHost: true,
+              playerId: this.localPlayerId,
+              joinedAt: Date.now(),
+            });
+            resolve(this.localPlayerId);
+          } catch (e) {
+            resolve(this.localPlayerId);
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          clearTimeout(timeoutId);
+          reject(new Error(`Netzwerkfehler beim Erstellen von Raum ${this.roomCode}`));
         }
       });
     });
@@ -84,94 +128,92 @@ export class NetworkManager {
   public async initClient(roomCode: string, name: string, preferredColor: PlayerColor): Promise<string> {
     this.isHost = false;
     this.roomCode = roomCode.toUpperCase();
-    const hostPeerId = formatRoomId(this.roomCode);
+    this.localPlayerId = 'player_' + Math.random().toString(36).substring(2, 9);
 
-    const { default: Peer } = await import('peerjs');
+    const supabase = this.getClient();
+    const channelName = `skeld_room_${this.roomCode}`;
 
     return new Promise((resolve, reject) => {
-      // Client gets an auto-assigned peer ID & STUN NAT traversal
-      const peer = new Peer(PEER_ICE_CONFIG);
-
-
-      let timeoutId: NodeJS.Timeout;
-
-      peer.on('open', (id) => {
-        this.peer = peer;
-        this.localPlayerId = id;
-
-        // Connect to the host
-        const conn = peer.connect(hostPeerId, {
-          reliable: true,
-        });
-
-        timeoutId = setTimeout(() => {
-          reject(new Error(`Verbindung zum Raum "${roomCode}" fehlgeschlagen (Timeout). Existiert der Raum?`));
-        }, 12000);
-
-        conn.on('open', () => {
-          clearTimeout(timeoutId);
-          this.hostConnection = conn;
-
-          // Listen for messages from Host
-          conn.on('data', (data: any) => {
-            this.notifyMessageHandlers(data as NetworkMessage, hostPeerId);
-          });
-
-          conn.on('close', () => {
-            console.log('Verbindung zum Host getrennt');
-            this.notifyDisconnectHandlers(hostPeerId);
-          });
-
-          conn.on('error', (err) => {
-            console.error('Verbindungsfehler zum Host:', err);
-          });
-
-          // Send JOIN_REQUEST immediately upon connection
-          const joinMsg: NetworkMessage = {
-            type: 'JOIN_REQUEST',
-            name,
-            preferredColor,
-          };
-          conn.send(joinMsg);
-
-          resolve(id);
-        });
-
-        conn.on('error', (err) => {
-          clearTimeout(timeoutId);
-          reject(new Error(`Konnte nicht mit Raum "${roomCode}" verbinden: ${err.message}`));
-        });
+      const channel = supabase.channel(channelName, {
+        config: {
+          broadcast: { ack: false, self: false },
+          presence: { key: this.localPlayerId },
+        },
       });
 
-      peer.on('error', (err: any) => {
-        console.error('PeerJS Client Error:', err);
-        if (err.type === 'peer-unavailable') {
-          reject(new Error(`Raum "${roomCode}" wurde nicht gefunden. Überprüfe den Code.`));
+      this.channel = channel;
+
+      let hasJoined = false;
+      let joinInterval: NodeJS.Timeout | null = null;
+
+      // Handle broadcast messages from Host
+      channel.on('broadcast', { event: 'msg' }, ({ payload }) => {
+        const data = payload as BroadcastPayload;
+        if (!data || !data.message) return;
+
+        // If message is directed to specific recipient, check if it's for us
+        if (data.recipientId && data.recipientId !== 'all' && data.recipientId !== this.localPlayerId) {
+          return;
+        }
+
+        if (data.message.type === 'JOIN_ACCEPTED') {
+          hasJoined = true;
+          this.hostId = data.senderId;
+          if (joinInterval) clearInterval(joinInterval);
+          this.notifyMessageHandlers(data.message, data.senderId);
+          resolve(this.localPlayerId);
         } else {
-          reject(err);
+          this.notifyMessageHandlers(data.message, data.senderId);
         }
       });
-    });
-  }
 
-  private handleIncomingConnection(conn: DataConnection) {
-    conn.on('open', () => {
-      this.connections.set(conn.peer, conn);
-      this.notifyConnectHandlers(conn.peer);
-
-      conn.on('data', (data: any) => {
-        this.notifyMessageHandlers(data as NetworkMessage, conn.peer);
+      // Presence tracking
+      channel.on('presence', { event: 'leave' }, ({ key }) => {
+        if (key === this.hostId) {
+          this.notifyDisconnectHandlers(key);
+        }
       });
 
-      conn.on('close', () => {
-        this.connections.delete(conn.peer);
-        this.notifyDisconnectHandlers(conn.peer);
-      });
+      const timeoutId = setTimeout(() => {
+        if (joinInterval) clearInterval(joinInterval);
+        if (!hasJoined) {
+          channel.unsubscribe();
+          reject(new Error(`Raum "${roomCode}" nicht gefunden oder Host ist offline.`));
+        }
+      }, 10000);
 
-      conn.on('error', (err) => {
-        console.error(`Fehler bei Client ${conn.peer}:`, err);
-        this.connections.delete(conn.peer);
-        this.notifyDisconnectHandlers(conn.peer);
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          try {
+            await channel.track({
+              isHost: false,
+              playerId: this.localPlayerId,
+              name,
+              color: preferredColor,
+              joinedAt: Date.now(),
+            });
+          } catch (e) {
+            // ignore presence track failure
+          }
+
+          // Repeatedly send JOIN_REQUEST until accepted or timeout
+          const sendJoin = () => {
+            if (hasJoined) return;
+            const joinMsg: NetworkMessage = {
+              type: 'JOIN_REQUEST',
+              name,
+              preferredColor,
+            };
+            this.sendToHost(joinMsg);
+          };
+
+          sendJoin();
+          joinInterval = setInterval(sendJoin, 1000);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          clearTimeout(timeoutId);
+          if (joinInterval) clearInterval(joinInterval);
+          reject(new Error(`Verbindungsfehler zu Raum "${roomCode}"`));
+        }
       });
     });
   }
@@ -207,14 +249,16 @@ export class NetworkManager {
    * Broadcast message to all connected peers (Host -> all clients)
    */
   public broadcast(message: NetworkMessage, excludePeerId?: string) {
-    if (!this.isHost) {
-      console.warn('Nur der Host kann Nachrichten an alle broadcasten');
-      return;
-    }
-    this.connections.forEach((conn, peerId) => {
-      if (peerId !== excludePeerId && conn.open) {
-        conn.send(message);
-      }
+    if (!this.channel) return;
+
+    this.channel.send({
+      type: 'broadcast',
+      event: 'msg',
+      payload: {
+        senderId: this.localPlayerId,
+        recipientId: 'all',
+        message,
+      },
     });
   }
 
@@ -222,38 +266,46 @@ export class NetworkManager {
    * Send message to a specific peer (Host -> specific client)
    */
   public sendToPeer(peerId: string, message: NetworkMessage) {
-    const conn = this.connections.get(peerId);
-    if (conn && conn.open) {
-      conn.send(message);
-    }
+    if (!this.channel) return;
+
+    this.channel.send({
+      type: 'broadcast',
+      event: 'msg',
+      payload: {
+        senderId: this.localPlayerId,
+        recipientId: peerId,
+        message,
+      },
+    });
   }
 
   /**
    * Send message to host (Client -> Host)
    */
   public sendToHost(message: NetworkMessage) {
+    if (!this.channel) return;
+
     if (this.isHost) {
-      // Local host loopback
+      // Loopback for host
       this.notifyMessageHandlers(message, this.localPlayerId);
       return;
     }
-    if (this.hostConnection && this.hostConnection.open) {
-      this.hostConnection.send(message);
-    } else {
-      console.warn('Keine aktive Verbindung zum Host');
-    }
+
+    this.channel.send({
+      type: 'broadcast',
+      event: 'msg',
+      payload: {
+        senderId: this.localPlayerId,
+        recipientId: this.hostId || 'host',
+        message,
+      },
+    });
   }
 
   public destroy() {
-    this.connections.forEach((conn) => conn.close());
-    this.connections.clear();
-    if (this.hostConnection) {
-      this.hostConnection.close();
-      this.hostConnection = null;
-    }
-    if (this.peer) {
-      this.peer.destroy();
-      this.peer = null;
+    if (this.channel) {
+      this.channel.unsubscribe();
+      this.channel = null;
     }
     this.messageHandlers.clear();
     this.disconnectHandlers.clear();
@@ -272,3 +324,4 @@ export class NetworkManager {
     return this.roomCode;
   }
 }
+
