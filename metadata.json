@@ -1,0 +1,6 @@
+{
+  "name": "Among Us 2D Web P2P",
+  "description": "2D-Multiplayer-Klon von Among Us im Browser mit P2P-Echtzeit-Synchronisation via PeerJS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
