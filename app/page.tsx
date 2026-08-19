@@ -379,7 +379,7 @@ function AmongUsApp() {
           }
 
           case 'CAST_VOTE': {
-            const voter = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            const voter = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
             if (
               newState.phase === 'meeting' &&
               newState.meetingPhase === 'voting' &&
@@ -414,8 +414,8 @@ function AmongUsApp() {
           }
 
           case 'COMPLETE_TASK': {
-            const player = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
-            if (player && player.isAlive && !player.completedTasks.includes(msg.taskId) && player.assignedTasks.includes(msg.taskId)) {
+            const player = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
+            if (player && !player.completedTasks.includes(msg.taskId) && player.assignedTasks.includes(msg.taskId)) {
               const updatedTasks = [...player.completedTasks, msg.taskId];
               newState.players = {
                 ...newState.players,
@@ -430,7 +430,7 @@ function AmongUsApp() {
                 newState.completedTasksCount = (newState.completedTasksCount || 0) + 1;
               }
 
-              if (player.id === localPlayerId) {
+              if (player.id === (localPlayerIdRef.current || localPlayerId)) {
                 setLocalPlayer((curr) => ({
                   ...curr,
                   completedTasks: curr.completedTasks.includes(msg.taskId) ? curr.completedTasks : [...curr.completedTasks, msg.taskId],
@@ -453,7 +453,7 @@ function AmongUsApp() {
           }
 
           case 'VENT_ACTION': {
-            const player = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            const player = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
             if (player && player.isAlive && player.role === 'impostor') {
               sound.playVentWhoosh();
 
@@ -498,7 +498,7 @@ function AmongUsApp() {
                 [player.id]: updatedPlayer,
               };
 
-              if (player.id === localPlayerId) {
+              if (player.id === (localPlayerIdRef.current || localPlayerId)) {
                 setLocalPlayer((prev) => ({
                   ...prev,
                   inVent: updatedPlayer.inVent,
@@ -517,7 +517,7 @@ function AmongUsApp() {
           }
 
           case 'TRIGGER_SABOTAGE': {
-            const sender = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            const sender = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
             if (!sender || !sender.isAlive || sender.role !== 'impostor') return prevState;
 
             playSabotageAlarm();
