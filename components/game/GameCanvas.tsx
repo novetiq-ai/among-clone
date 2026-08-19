@@ -507,6 +507,10 @@ export function GameCanvas({
 
       const canvas = canvasRef.current;
       if (canvas) {
+        if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        }
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const isInteracting = !!activeTaskRef.current || showCCTVRef.current || showAdminRadarRef.current || showSabotageModalRef.current;
