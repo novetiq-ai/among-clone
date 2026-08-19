@@ -437,7 +437,9 @@ export function Lobby({
                           if (botCount > 0) {
                             onUpdateSettings({ botCount: 0 });
                           } else {
-                            onUpdateSettings({ botCount: 4 });
+                            const humanCount = playerList.filter((p) => !p.isBot).length;
+                            const maxBotsAllowed = Math.max(0, Math.min(4, settings.maxPlayers - humanCount));
+                            onUpdateSettings({ botCount: maxBotsAllowed });
                           }
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${

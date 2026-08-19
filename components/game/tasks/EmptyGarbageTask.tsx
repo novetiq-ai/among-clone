@@ -75,11 +75,17 @@ export function EmptyGarbageTask({ onComplete, onClose }: EmptyGarbageTaskProps)
     };
   }, [leverHeld]);
 
-  const handleLeverDown = () => {
+  const handleLeverDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
     setLeverHeld(true);
   };
 
-  const handleLeverUp = () => {
+  const handleLeverUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
     setLeverHeld(false);
   };
 

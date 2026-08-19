@@ -144,8 +144,9 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
     setAsteroids((prev) => {
       const remaining: Asteroid[] = [];
       for (const ast of prev) {
+        const radius = ast.size / 2;
         const dist = Math.hypot(ast.x - clickX, ast.y - clickY);
-        if (!hitFound && dist < ast.size + 15) {
+        if (!hitFound && dist < radius + 8) {
           hitFound = true;
           // Trigger explosion
           const expId = nextId.current++;

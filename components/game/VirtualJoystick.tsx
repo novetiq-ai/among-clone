@@ -141,6 +141,7 @@ export function VirtualJoystick({ onMove, mode = 'joystick' }: VirtualJoystickPr
         <button
           type="button"
           onPointerDown={() => handleDpadPointerDown('up')}
+          onPointerEnter={(e) => { if (e.buttons > 0) handleDpadPointerDown('up'); }}
           onPointerUp={() => handleDpadPointerUp('up')}
           onPointerLeave={() => handleDpadPointerUp('up')}
           className="absolute top-0 left-12 w-12 h-12 rounded-t-xl bg-slate-900/90 hover:bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-200 active:bg-cyan-600 active:border-cyan-400 active:text-white transition-colors cursor-pointer shadow-lg"
@@ -152,6 +153,7 @@ export function VirtualJoystick({ onMove, mode = 'joystick' }: VirtualJoystickPr
         <button
           type="button"
           onPointerDown={() => handleDpadPointerDown('left')}
+          onPointerEnter={(e) => { if (e.buttons > 0) handleDpadPointerDown('left'); }}
           onPointerUp={() => handleDpadPointerUp('left')}
           onPointerLeave={() => handleDpadPointerUp('left')}
           className="absolute top-12 left-0 w-12 h-12 rounded-l-xl bg-slate-900/90 hover:bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-200 active:bg-cyan-600 active:border-cyan-400 active:text-white transition-colors cursor-pointer shadow-lg"
@@ -168,6 +170,7 @@ export function VirtualJoystick({ onMove, mode = 'joystick' }: VirtualJoystickPr
         <button
           type="button"
           onPointerDown={() => handleDpadPointerDown('right')}
+          onPointerEnter={(e) => { if (e.buttons > 0) handleDpadPointerDown('right'); }}
           onPointerUp={() => handleDpadPointerUp('right')}
           onPointerLeave={() => handleDpadPointerUp('right')}
           className="absolute top-12 right-0 w-12 h-12 rounded-r-xl bg-slate-900/90 hover:bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-200 active:bg-cyan-600 active:border-cyan-400 active:text-white transition-colors cursor-pointer shadow-lg"
@@ -179,6 +182,7 @@ export function VirtualJoystick({ onMove, mode = 'joystick' }: VirtualJoystickPr
         <button
           type="button"
           onPointerDown={() => handleDpadPointerDown('down')}
+          onPointerEnter={(e) => { if (e.buttons > 0) handleDpadPointerDown('down'); }}
           onPointerUp={() => handleDpadPointerUp('down')}
           onPointerLeave={() => handleDpadPointerUp('down')}
           className="absolute bottom-0 left-12 w-12 h-12 rounded-b-xl bg-slate-900/90 hover:bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-slate-200 active:bg-cyan-600 active:border-cyan-400 active:text-white transition-colors cursor-pointer shadow-lg"

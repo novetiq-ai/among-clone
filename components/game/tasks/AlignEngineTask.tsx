@@ -37,10 +37,9 @@ export function AlignEngineTask({ onComplete, onClose }: AlignEngineTaskProps) {
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
     // Center is 50%. Offset = (yPct - 50) * 1.5
     const newOffset = Math.max(-45, Math.min(45, (yPct - 50) * 1.5));
-    setOffset(newOffset);
-
-    // If within +- 3 degrees of 0
+    // If within +- 3.5 degrees of 0, snap directly to 0
     if (Math.abs(newOffset) < 3.5) {
+      setOffset(0);
       if (!isAligned) {
         setIsAligned(true);
         sound.playShieldClick();
@@ -53,6 +52,7 @@ export function AlignEngineTask({ onComplete, onClose }: AlignEngineTaskProps) {
         }
       }
     } else {
+      setOffset(newOffset);
       setIsAligned(false);
     }
   };

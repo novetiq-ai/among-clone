@@ -282,9 +282,9 @@ export function MainMenu({
                 </label>
                 <input
                   type="text"
-                  maxLength={6}
+                  maxLength={4}
                   value={roomCodeInput}
-                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
+                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase().slice(0, 4))}
                   placeholder="Z.B. X4Z9"
                   className="w-full bg-slate-950 border border-purple-500/50 rounded-xl px-4 py-3.5 font-mono text-center text-3xl font-black tracking-widest text-purple-400 focus:outline-none focus:border-purple-400 uppercase shadow-inner"
                   autoFocus

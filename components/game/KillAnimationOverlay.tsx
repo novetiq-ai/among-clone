@@ -29,6 +29,7 @@ export function KillAnimationOverlay({
 
   const [frame, setFrame] = useState(0);
   const onFinishedRef = useRef(onFinished);
+  const hasEndedRef = useRef(false);
 
   useEffect(() => {
     onFinishedRef.current = onFinished;
@@ -38,16 +39,25 @@ export function KillAnimationOverlay({
     // Play dramatic kill sound once
     playKillSound();
 
+    const finishOnce = () => {
+      if (!hasEndedRef.current) {
+        hasEndedRef.current = true;
+        onFinishedRef.current();
+      }
+    };
+
     const interval = setInterval(() => {
       setFrame((prev) => prev + 1);
     }, 40);
 
     const timeout = setTimeout(() => {
-      onFinishedRef.current();
+      finishOnce();
     }, 2000);
 
-    const handleKey = () => {
-      onFinishedRef.current();
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+        finishOnce();
+      }
     };
     window.addEventListener('keydown', handleKey);
 
@@ -60,7 +70,12 @@ export function KillAnimationOverlay({
 
   return (
     <div
-      onClick={() => onFinishedRef.current()}
+      onClick={() => {
+        if (!hasEndedRef.current) {
+          hasEndedRef.current = true;
+          onFinishedRef.current();
+        }
+      }}
       className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center overflow-hidden select-none cursor-pointer"
     >
       {/* Red Blood Screen Flash */}

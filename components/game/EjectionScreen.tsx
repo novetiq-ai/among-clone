@@ -38,6 +38,7 @@ export function EjectionScreen({ data }: EjectionScreenProps) {
   // Typewriter effect
   useEffect(() => {
     let charIdx = 0;
+    let subInterval: NodeJS.Timeout | null = null;
     const headlineInterval = setInterval(() => {
       if (charIdx < fullHeadline.length) {
         setDisplayedHeadline(fullHeadline.slice(0, charIdx + 1));
@@ -47,18 +48,21 @@ export function EjectionScreen({ data }: EjectionScreenProps) {
         clearInterval(headlineInterval);
         // Start subtext
         let subIdx = 0;
-        const subInterval = setInterval(() => {
+        subInterval = setInterval(() => {
           if (subIdx < fullSubtext.length) {
             setDisplayedSubtext(fullSubtext.slice(0, subIdx + 1));
             subIdx++;
-          } else {
+          } else if (subInterval) {
             clearInterval(subInterval);
           }
         }, 50);
       }
     }, 65);
 
-    return () => clearInterval(headlineInterval);
+    return () => {
+      clearInterval(headlineInterval);
+      if (subInterval) clearInterval(subInterval);
+    };
   }, [fullHeadline, fullSubtext]);
 
   return (

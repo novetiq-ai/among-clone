@@ -4,6 +4,24 @@
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private hasInteractionListener: boolean = false;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      const unlockAudio = () => {
+        this.initCtx();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+        window.removeEventListener('touchstart', unlockAudio);
+      };
+      window.addEventListener('pointerdown', unlockAudio, { once: true });
+      window.addEventListener('keydown', unlockAudio, { once: true });
+      window.addEventListener('touchstart', unlockAudio, { once: true });
+    }
+  }
 
   private initCtx() {
     if (!this.ctx && typeof window !== 'undefined') {
@@ -13,7 +31,7 @@ class SoundEngine {
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(() => {});
     }
   }
 

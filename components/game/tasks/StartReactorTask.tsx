@@ -28,26 +28,44 @@ export function StartReactorTask({ onComplete, onClose }: StartReactorTaskProps)
   const [isShowingSequence, setIsShowingSequence] = useState<boolean>(true);
   const [errorFlash, setErrorFlash] = useState<boolean>(false);
 
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  // Clear all pending sequence timeouts
+  const clearAllTimeouts = useCallback(() => {
+    timeoutsRef.current.forEach((t) => clearTimeout(t));
+    timeoutsRef.current = [];
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearAllTimeouts();
+    };
+  }, [clearAllTimeouts]);
+
   // Playback sequence function
   const playSequence = useCallback((round: number, fullSeq: number[]) => {
+    clearAllTimeouts();
     setIsShowingSequence(true);
     setPlayerInputIndex(0);
     const roundSeq = fullSeq.slice(0, round);
 
     roundSeq.forEach((padIndex, step) => {
-      setTimeout(() => {
+      const t1 = setTimeout(() => {
         setActiveDisplayIndex(padIndex);
         sound.playToneBeep(350 + padIndex * 60, 0.18);
-        setTimeout(() => {
+        const t2 = setTimeout(() => {
           setActiveDisplayIndex(null);
         }, 300);
+        timeoutsRef.current.push(t2);
       }, step * 500 + 400);
+      timeoutsRef.current.push(t1);
     });
 
-    setTimeout(() => {
+    const tFinal = setTimeout(() => {
       setIsShowingSequence(false);
     }, roundSeq.length * 500 + 500);
-  }, []);
+    timeoutsRef.current.push(tFinal);
+  }, [clearAllTimeouts]);
 
   // Trigger sequence playback whenever round changes
   useEffect(() => {
@@ -56,6 +74,7 @@ export function StartReactorTask({ onComplete, onClose }: StartReactorTaskProps)
         playSequence(currentRound, sequence);
       }
     }, 100);
+    timeoutsRef.current.push(timer);
     return () => clearTimeout(timer);
   }, [currentRound, sequence, playSequence]);
 

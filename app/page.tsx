@@ -78,6 +78,7 @@ function AmongUsApp() {
   const meetingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const botIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sabotageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const botVoteTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const botTargetState = useRef<Record<string, { targetX: number; targetY: number; path: any[]; pathIdx: number; pauseTicks: number; killCooldownTicks?: number }>>({});
 
   // Helper to check win conditions (Authoritative on Host)
@@ -266,49 +267,70 @@ function AmongUsApp() {
           }
 
           case 'KILL_PLAYER': {
+            const killer = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
             const victim = newState.players[msg.targetId];
-            if (victim && victim.isAlive) {
-              victim.isAlive = false;
-              sound.playKillSound();
 
-              const deadBody: DeadBody = {
-                id: `body-${Date.now()}-${msg.targetId}`,
-                playerId: victim.id,
-                playerName: victim.name,
-                color: victim.color,
-                x: msg.x,
-                y: msg.y,
-                reported: false,
-              };
+            // Host Security Validation: Killer must be alive Impostor, victim alive, within range
+            if (!killer || !killer.isAlive || killer.role !== 'impostor') return prevState;
+            if (!victim || !victim.isAlive) return prevState;
 
-              newState.deadBodies = [...newState.deadBodies, deadBody];
-              newState.players[msg.targetId] = victim;
+            const dist = Math.hypot(killer.x - victim.x, killer.y - victim.y);
+            if (dist > 250) return prevState;
 
-              const winCheck = checkWinConditions(newState);
-              if (winCheck.winner) {
-                newState.phase = 'game_over';
-                newState.winner = winCheck.winner;
-                newState.winReason = winCheck.winReason;
-              }
+            sound.playKillSound();
 
-              networkRef.current?.broadcast({
-                type: 'STATE_SYNC',
-                gameState: newState,
-              });
+            const deadBody: DeadBody = {
+              id: `body-${Date.now()}-${msg.targetId}`,
+              playerId: victim.id,
+              playerName: victim.name,
+              color: victim.color,
+              x: msg.x,
+              y: msg.y,
+              reported: false,
+            };
+
+            newState.deadBodies = [...newState.deadBodies, deadBody];
+            newState.players = {
+              ...newState.players,
+              [msg.targetId]: {
+                ...victim,
+                isAlive: false,
+              },
+            };
+
+            const winCheck = checkWinConditions(newState);
+            if (winCheck.winner) {
+              newState.phase = 'game_over';
+              newState.winner = winCheck.winner;
+              newState.winReason = winCheck.winReason;
             }
+
+            networkRef.current?.broadcast({
+              type: 'STATE_SYNC',
+              gameState: newState,
+            });
             return newState;
           }
 
           case 'REPORT_BODY':
           case 'EMERGENCY_MEETING': {
             if (newState.phase === 'playing') {
-              const reporter = newState.players[msg.reporterId];
-              if (!reporter || !reporter.isAlive) return prevState;
+              const reporter = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+              if (!reporter || !reporter.isAlive || reporter.inVent) return prevState;
 
               if (msg.type === 'EMERGENCY_MEETING') {
                 const meetingsLeft = reporter.emergencyMeetingsLeft ?? newState.settings.emergencyMeetings;
                 if (meetingsLeft <= 0 || newState.activeSabotage) return prevState;
-                reporter.emergencyMeetingsLeft = meetingsLeft - 1;
+                newState.players = {
+                  ...newState.players,
+                  [reporter.id]: {
+                    ...reporter,
+                    emergencyMeetingsLeft: meetingsLeft - 1,
+                  },
+                };
+              } else if (msg.type === 'REPORT_BODY' && msg.bodyId) {
+                const body = newState.deadBodies.find((b) => b.id === msg.bodyId && !b.reported);
+                if (!body) return prevState;
               }
 
               sound.playEmergencySiren();
@@ -322,12 +344,17 @@ function AmongUsApp() {
               // Clear active sabotages when meeting starts
               newState.activeSabotage = null;
 
-              // Reset votes
-              Object.values(newState.players).forEach((p) => {
-                p.hasVoted = false;
-                p.votedFor = null;
-                p.inVent = false;
-              });
+              // Reset votes immutably
+              const resetPlayers: Record<string, Player> = {};
+              for (const [pId, p] of Object.entries(newState.players)) {
+                resetPlayers[pId] = {
+                  ...p,
+                  hasVoted: false,
+                  votedFor: null,
+                  inVent: false,
+                };
+              }
+              newState.players = resetPlayers;
 
               networkRef.current?.broadcast({
                 type: 'STATE_SYNC',
@@ -338,11 +365,23 @@ function AmongUsApp() {
           }
 
           case 'CAST_VOTE': {
-            const voter = newState.players[msg.voterId];
-            if (newState.phase === 'meeting' && newState.meetingPhase === 'voting' && voter && voter.isAlive && !voter.hasVoted) {
+            const voter = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            if (
+              newState.phase === 'meeting' &&
+              newState.meetingPhase === 'voting' &&
+              voter &&
+              voter.isAlive &&
+              !voter.hasVoted
+            ) {
               sound.playButtonClick();
-              voter.hasVoted = true;
-              voter.votedFor = msg.targetId;
+              newState.players = {
+                ...newState.players,
+                [voter.id]: {
+                  ...voter,
+                  hasVoted: true,
+                  votedFor: msg.targetId,
+                },
+              };
 
               // Check if all alive players have voted
               const alivePlayers = Object.values(newState.players).filter((p) => p.isAlive);
@@ -361,12 +400,12 @@ function AmongUsApp() {
           }
 
           case 'COMPLETE_TASK': {
-            const player = newState.players[msg.playerId];
-            if (player && !player.completedTasks.includes(msg.taskId)) {
+            const player = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            if (player && player.isAlive && !player.completedTasks.includes(msg.taskId) && player.assignedTasks.includes(msg.taskId)) {
               const updatedTasks = [...player.completedTasks, msg.taskId];
               newState.players = {
                 ...newState.players,
-                [msg.playerId]: {
+                [player.id]: {
                   ...player,
                   completedTasks: updatedTasks,
                 },
@@ -377,7 +416,7 @@ function AmongUsApp() {
                 newState.completedTasksCount = (newState.completedTasksCount || 0) + 1;
               }
 
-              if (msg.playerId === localPlayerId) {
+              if (player.id === localPlayerId) {
                 setLocalPlayer((curr) => ({
                   ...curr,
                   completedTasks: curr.completedTasks.includes(msg.taskId) ? curr.completedTasks : [...curr.completedTasks, msg.taskId],
@@ -400,42 +439,58 @@ function AmongUsApp() {
           }
 
           case 'VENT_ACTION': {
-            const player = newState.players[msg.playerId];
-            if (player) {
+            const player = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            if (player && player.isAlive && player.role === 'impostor') {
               sound.playVentWhoosh();
-              const activeVentId = msg.action === 'travel' && msg.targetVentId ? msg.targetVentId : msg.ventId;
-              const vent = VENTS.find((v) => v.id === activeVentId);
 
-              if (msg.action === 'enter') {
-                player.inVent = true;
-                player.ventId = msg.ventId;
-                if (vent) {
-                  player.x = vent.x;
-                  player.y = vent.y;
-                }
-              } else if (msg.action === 'exit') {
-                player.inVent = false;
-                player.ventId = undefined;
-                if (vent) {
-                  player.x = vent.x;
-                  player.y = vent.y;
-                }
-              } else if (msg.action === 'travel' && msg.targetVentId) {
-                player.inVent = true;
-                player.ventId = msg.targetVentId;
-                if (vent) {
-                  player.x = vent.x;
-                  player.y = vent.y;
+              // Validate vent connections if traveling
+              if (msg.action === 'travel' && msg.targetVentId) {
+                const currentVent = VENTS.find((v) => v.id === player.ventId);
+                if (!currentVent || !currentVent.connectedVents.includes(msg.targetVentId)) {
+                  return prevState;
                 }
               }
 
-              if (msg.playerId === localPlayerId) {
+              const activeVentId = msg.action === 'travel' && msg.targetVentId ? msg.targetVentId : msg.ventId;
+              const vent = VENTS.find((v) => v.id === activeVentId);
+
+              const updatedPlayer: Player = { ...player };
+
+              if (msg.action === 'enter') {
+                updatedPlayer.inVent = true;
+                updatedPlayer.ventId = msg.ventId;
+                if (vent) {
+                  updatedPlayer.x = vent.x;
+                  updatedPlayer.y = vent.y;
+                }
+              } else if (msg.action === 'exit') {
+                updatedPlayer.inVent = false;
+                updatedPlayer.ventId = undefined;
+                if (vent) {
+                  updatedPlayer.x = vent.x;
+                  updatedPlayer.y = vent.y;
+                }
+              } else if (msg.action === 'travel' && msg.targetVentId) {
+                updatedPlayer.inVent = true;
+                updatedPlayer.ventId = msg.targetVentId;
+                if (vent) {
+                  updatedPlayer.x = vent.x;
+                  updatedPlayer.y = vent.y;
+                }
+              }
+
+              newState.players = {
+                ...newState.players,
+                [player.id]: updatedPlayer,
+              };
+
+              if (player.id === localPlayerId) {
                 setLocalPlayer((prev) => ({
                   ...prev,
-                  inVent: player.inVent,
-                  ventId: player.ventId,
-                  x: player.x,
-                  y: player.y,
+                  inVent: updatedPlayer.inVent,
+                  ventId: updatedPlayer.ventId,
+                  x: updatedPlayer.x,
+                  y: updatedPlayer.y,
                 }));
               }
 
@@ -448,6 +503,9 @@ function AmongUsApp() {
           }
 
           case 'TRIGGER_SABOTAGE': {
+            const sender = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+            if (!sender || !sender.isAlive || sender.role !== 'impostor') return prevState;
+
             playSabotageAlarm();
             const countdown = msg.sabotageType === 'reactor' || msg.sabotageType === 'o2' ? 30 : 0;
             newState.activeSabotage = {
@@ -805,6 +863,7 @@ function AmongUsApp() {
   const handleAddBot = useCallback(() => {
     if (!isHost) return;
     setGameState((prev) => {
+      if (prev.phase !== 'lobby') return prev;
       const currentPlayers = Object.values(prev.players);
       if (currentPlayers.length >= prev.settings.maxPlayers) return prev;
 
@@ -866,6 +925,7 @@ function AmongUsApp() {
   const handleRemoveBot = useCallback((botIdToRemove?: string) => {
     if (!isHost) return;
     setGameState((prev) => {
+      if (prev.phase !== 'lobby') return prev;
       const updatedPlayers = { ...prev.players };
       const bots = Object.values(updatedPlayers).filter((p) => p.isBot);
       if (bots.length === 0) return prev;
@@ -896,6 +956,7 @@ function AmongUsApp() {
   const handleUpdateSettings = useCallback((newSettings: Partial<GameSettings>) => {
     if (!isHost) return;
     setGameState((prev) => {
+      if (prev.phase !== 'lobby') return prev;
       let updatedPlayers = { ...prev.players };
 
       // Handle dynamic bot count adjustment
@@ -1147,11 +1208,15 @@ function AmongUsApp() {
             newPhase = 'voting';
             newTimer = prev.settings.votingTime;
 
+            // Clear any prior bot vote timeouts
+            botVoteTimeoutsRef.current.forEach((t) => clearTimeout(t));
+            botVoteTimeoutsRef.current = [];
+
             // Trigger Bot Voting after random delays
             Object.values(prev.players)
               .filter((p) => p.isBot && p.isAlive)
               .forEach((bot) => {
-                setTimeout(() => {
+                const timerId = setTimeout(() => {
                   setGameState((s) => {
                     if (s.phase !== 'meeting' || s.meetingPhase !== 'voting' || !s.players[bot.id] || s.players[bot.id].hasVoted) return s;
                     const aliveTargets = Object.values(s.players).filter((p) => p.isAlive);
@@ -1177,11 +1242,15 @@ function AmongUsApp() {
                     return updated;
                   });
                 }, Math.random() * 6000 + 1500);
+                botVoteTimeoutsRef.current.push(timerId);
               });
           }
 
           // Voting ended -> Switch to Results Phase (Show votes for 4s)
           if (newPhase === 'voting' && newTimer <= 0) {
+            // Cancel pending bot votes immediately
+            botVoteTimeoutsRef.current.forEach((t) => clearTimeout(t));
+            botVoteTimeoutsRef.current = [];
             newPhase = 'results';
             newTimer = 4;
           }
@@ -1189,6 +1258,8 @@ function AmongUsApp() {
           // Results ended -> Calculate Ejection
           if (newPhase === 'results' && newTimer <= 0) {
             clearInterval(meetingIntervalRef.current!);
+            botVoteTimeoutsRef.current.forEach((t) => clearTimeout(t));
+            botVoteTimeoutsRef.current = [];
 
             // Count votes
             const voteCounts: Record<string, number> = { skip: 0 };
@@ -1390,7 +1461,7 @@ function AmongUsApp() {
         const now = Date.now();
 
         for (const p of allPlayersList) {
-          if (p.isBot && p.isAlive && !p.inVent) {
+          if (p.isBot && !p.inVent) {
             anyBotMoved = true;
 
             // Initialize bot state
@@ -1412,8 +1483,8 @@ function AmongUsApp() {
               bState.killCooldownTicks--;
             }
 
-            // 1. BOT CREWMATE: Check for dead bodies in Line of Sight to report
-            if (p.role !== 'impostor' && !triggeredReport) {
+            // 1. BOT CREWMATE (Alive only): Check for dead bodies in Line of Sight to report
+            if (p.isAlive && p.role !== 'impostor' && !triggeredReport) {
               for (const body of updatedDeadBodies) {
                 if (body.reported) continue;
                 const d = Math.hypot(p.x - body.x, p.y - body.y);
@@ -1425,8 +1496,8 @@ function AmongUsApp() {
               }
             }
 
-            // 2. BOT IMPOSTOR: Check for isolated crewmate to kill
-            if (p.role === 'impostor' && (!bState.killCooldownTicks || bState.killCooldownTicks <= 0)) {
+            // 2. BOT IMPOSTOR (Alive only): Check for isolated crewmate to kill
+            if (p.isAlive && p.role === 'impostor' && (!bState.killCooldownTicks || bState.killCooldownTicks <= 0)) {
               const potentialVictims = allPlayersList.filter(
                 (v) => v.id !== p.id && v.isAlive && v.role !== 'impostor' && !v.inVent
               );
@@ -1469,13 +1540,13 @@ function AmongUsApp() {
               }
             }
 
-            // 3. Navigation & Pathfinding
+            // 3. Navigation & Pathfinding (Alive bots & Ghost bots)
             if (!bState.path || bState.path.length === 0 || bState.pathIdx >= bState.path.length) {
-              // Prioritize sabotage repair if active, otherwise random task
               let targetX = p.x;
               let targetY = p.y;
 
-              if (updatedActiveSabotage && p.role !== 'impostor' && Math.random() < 0.6) {
+              // Alive Crewmate bots prioritize sabotage repair
+              if (p.isAlive && updatedActiveSabotage && p.role !== 'impostor' && Math.random() < 0.6) {
                 if (updatedActiveSabotage.type === 'lights') {
                   targetX = 670;
                   targetY = 960;
@@ -1487,7 +1558,10 @@ function AmongUsApp() {
                   targetY = 800;
                 }
               } else {
-                const targetTask = ALL_TASKS[Math.floor(Math.random() * ALL_TASKS.length)];
+                // Ghost or living crewmate navigates to assigned task
+                const unfinishedTask = p.assignedTasks.find((tId) => !p.completedTasks.includes(tId));
+                const foundTaskDef = unfinishedTask ? ALL_TASKS.find((t) => t.id === unfinishedTask) : null;
+                const targetTask = foundTaskDef || ALL_TASKS[Math.floor(Math.random() * ALL_TASKS.length)];
                 targetX = targetTask.x;
                 targetY = targetTask.y;
               }
@@ -1505,7 +1579,7 @@ function AmongUsApp() {
               bState.pauseTicks--;
               p.isMoving = false;
 
-              // If bot finishes working on an assigned task, complete it!
+              // If bot finishes working on an assigned task, complete it! (Crewmate living & ghosts)
               if (bState.pauseTicks === 0 && p.role !== 'impostor') {
                 const assignedUnfinished = p.assignedTasks.find((tId) => !p.completedTasks.includes(tId));
                 if (assignedUnfinished) {
@@ -1513,8 +1587,8 @@ function AmongUsApp() {
                   updatedCompletedTasksCount++;
                 }
 
-                // If at sabotage location, fix it
-                if (updatedActiveSabotage) {
+                // If at sabotage location, fix it (Living crewmates only)
+                if (p.isAlive && updatedActiveSabotage) {
                   const sab = updatedActiveSabotage;
                   let atSab = false;
                   if (sab.type === 'lights' && Math.hypot(p.x - 670, p.y - 960) < 100) atSab = true;
@@ -1832,16 +1906,23 @@ function AmongUsApp() {
 
   const handlePlayAgain = () => {
     if (!isHost) return;
+    botTargetState.current = {};
+    botVoteTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    botVoteTimeoutsRef.current = [];
+
     setGameState((prev) => {
-      const resetPlayers = { ...prev.players };
-      Object.values(resetPlayers).forEach((p) => {
-        p.isAlive = true;
-        p.hasVoted = false;
-        p.votedFor = null;
-        p.inVent = false;
-        p.assignedTasks = [];
-        p.completedTasks = [];
-        p.role = 'unassigned';
+      const resetPlayers: Record<string, Player> = {};
+      Object.entries(prev.players).forEach(([pId, p]) => {
+        resetPlayers[pId] = {
+          ...p,
+          isAlive: true,
+          hasVoted: false,
+          votedFor: null,
+          inVent: false,
+          assignedTasks: [],
+          completedTasks: [],
+          role: 'unassigned',
+        };
       });
 
       const nextLobbyState: GameState = {
@@ -1868,6 +1949,9 @@ function AmongUsApp() {
   };
 
   const handleLeaveRoom = () => {
+    botTargetState.current = {};
+    botVoteTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    botVoteTimeoutsRef.current = [];
     networkRef.current?.destroy();
     networkRef.current = null;
     setInRoom(false);

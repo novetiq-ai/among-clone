@@ -21,6 +21,8 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
   const [swipeProgress, setSwipeProgress] = useState(0); // 0 to 100
   const [swipeStatus, setSwipeStatus] = useState<'idle' | 'swiping' | 'too_fast' | 'too_slow' | 'accepted'>('idle');
   const startTimeRef = useRef<number>(0);
+  const startPercentRef = useRef<number>(0);
+  const hasMovedThroughMiddleRef = useRef<boolean>(false);
   const slotRef = useRef<HTMLDivElement>(null);
 
   const handleTakeCard = () => {
@@ -31,27 +33,33 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
     }
   };
 
-  const updateSwipeProgress = (clientX: number) => {
-    if (!slotRef.current) return;
+  const getPercent = (clientX: number) => {
+    if (!slotRef.current) return 0;
     const rect = slotRef.current.getBoundingClientRect();
     const currentX = clientX - rect.left;
     const totalWidth = rect.width;
-    const percent = Math.max(0, Math.min(100, (currentX / totalWidth) * 100));
-    setSwipeProgress(percent);
+    return Math.max(0, Math.min(100, (currentX / totalWidth) * 100));
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!cardTaken || swipeStatus === 'accepted') return;
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
+    const pct = getPercent(e.clientX);
     startTimeRef.current = now;
+    startPercentRef.current = pct;
+    hasMovedThroughMiddleRef.current = false;
     sound.playCardSwipe();
     setSwipeStatus('swiping');
-    updateSwipeProgress(e.clientX);
+    setSwipeProgress(pct);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (swipeStatus === 'swiping') {
-      updateSwipeProgress(e.clientX);
+      const pct = getPercent(e.clientX);
+      if (pct >= 35 && pct <= 75) {
+        hasMovedThroughMiddleRef.current = true;
+      }
+      setSwipeProgress(pct);
     }
   };
 
@@ -61,8 +69,11 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
     const duration = now - startTimeRef.current;
 
-    if (swipeProgress < 75) {
-      // Incomplete swipe
+    // Must start on left side (< 30%) and travel through the middle
+    const isValidSwipePath = startPercentRef.current <= 30 && hasMovedThroughMiddleRef.current;
+
+    if (swipeProgress < 80 || !isValidSwipePath) {
+      // Incomplete swipe or skipped middle
       sound.playErrorBuzz();
       setSwipeStatus('too_slow');
       setSwipeProgress(0);
@@ -71,7 +82,7 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
       sound.playErrorBuzz();
       setSwipeStatus('too_fast');
       setSwipeProgress(0);
-    } else if (duration > 1400) {
+    } else if (duration > 1500) {
       // Too slow
       sound.playErrorBuzz();
       setSwipeStatus('too_slow');

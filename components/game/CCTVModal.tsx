@@ -14,8 +14,13 @@ interface CCTVModalProps {
 }
 
 export function CCTVModal({ players, deadBodies, localPlayer, onClose }: CCTVModalProps) {
+  const hasPlayedRef = React.useRef(false);
+
   useEffect(() => {
-    playCameraClick();
+    if (!hasPlayedRef.current) {
+      hasPlayedRef.current = true;
+      playCameraClick();
+    }
   }, []);
 
   // Camera feeds with their coverage area bounding boxes

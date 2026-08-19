@@ -124,13 +124,16 @@ export function drawTheSkeld(
   ctx.fillStyle = '#030712';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // Apply Camera translation
-  ctx.translate(-viewX, -viewY);
-
   const time = typeof performance !== 'undefined' ? performance.now() : 0;
 
-  // 2. Draw Space Environment (Deep Cosmos, Stars, Nebulae, Asteroids)
+  // 2. Draw Space Environment with Parallax (0.2x translation for deep cosmic depth)
+  ctx.save();
+  ctx.translate(-viewX * 0.2, -viewY * 0.2);
   drawDeepSpace(ctx, time);
+  ctx.restore();
+
+  // Apply Camera translation for The Skeld ship interior
+  ctx.translate(-viewX, -viewY);
 
   // 3. Draw Outer Spaceship Hull & Silhouette
   drawShipHull(ctx, time);
@@ -1229,34 +1232,52 @@ function drawSecurityCameras(ctx: CanvasRenderingContext2D, isSecurityCamActive:
 function drawLockedDoors(ctx: CanvasRenderingContext2D, lockedDoors: Record<string, number>, time: number) {
   const now = Date.now();
   const roomDoorways: Record<string, Array<{ x: number; y: number; w: number; h: number }>> = {
-    Cafeteria: [
+    cafeteria: [
       { x: 890, y: 460, w: 25, h: 120 },
       { x: 1475, y: 460, w: 25, h: 120 },
       { x: 1060, y: 890, w: 200, h: 25 },
     ],
-    MedBay: [
+    medbay: [
       { x: 930, y: 460, w: 25, h: 100 },
       { x: 670, y: 610, w: 120, h: 25 },
     ],
-    Security: [
+    security: [
       { x: 670, y: 630, w: 120, h: 25 },
       { x: 670, y: 890, w: 120, h: 25 },
       { x: 610, y: 740, w: 25, h: 120 },
     ],
-    Electrical: [
+    electrical: [
       { x: 670, y: 910, w: 120, h: 25 },
       { x: 930, y: 1080, w: 25, h: 120 },
     ],
-    Storage: [
+    storage: [
       { x: 1060, y: 1010, w: 200, h: 25 },
       { x: 890, y: 1080, w: 25, h: 120 },
       { x: 1390, y: 1020, w: 25, h: 120 },
     ],
+    admin: [
+      { x: 1460, y: 960, w: 25, h: 120 },
+    ],
+    reactor: [
+      { x: 200, y: 560, w: 140, h: 25 },
+      { x: 200, y: 1020, w: 140, h: 25 },
+      { x: 420, y: 720, w: 25, h: 120 },
+    ],
+    upper_engine: [
+      { x: 600, y: 440, w: 25, h: 120 },
+      { x: 220, y: 560, w: 25, h: 100 },
+    ],
+    lower_engine: [
+      { x: 600, y: 1080, w: 25, h: 120 },
+      { x: 220, y: 980, w: 25, h: 100 },
+    ],
   };
 
   for (const [room, expiry] of Object.entries(lockedDoors)) {
-    if (expiry > now && roomDoorways[room]) {
-      for (const door of roomDoorways[room]) {
+    const normalized = room.toLowerCase().replace(/\s+/g, '_');
+    const doors = roomDoorways[normalized] || roomDoorways[room.toLowerCase()];
+    if (expiry > now && doors) {
+      for (const door of doors) {
         // Red blast door bulkheads
         ctx.fillStyle = '#7f1d1d';
         ctx.fillRect(door.x, door.y, door.w, door.h);
@@ -1369,11 +1390,14 @@ function drawPlayers(
 ) {
   const isLocalGhost = !localPlayer.isAlive;
   const isLightsOut = activeSabotage?.type === 'lights';
-  const visionRadius = localPlayer.role === 'impostor' ? 380 : isLightsOut ? 110 : 280;
+  const visionRadius = (localPlayer.role === 'impostor' || isLocalGhost) ? 380 : isLightsOut ? 110 : 280;
 
-  for (const p of Object.values(players)) {
-    // If player is in vent, don't draw for others
-    if (p.inVent && p.id !== localPlayer.id) continue;
+  // 1. Y-Sort all players so players lower on screen render in front
+  const sortedPlayers = Object.values(players).sort((a, b) => a.y - b.y);
+
+  for (const p of sortedPlayers) {
+    // If player is in vent, only draw for self or other Impostors
+    if (p.inVent && p.id !== localPlayer.id && localPlayer.role !== 'impostor') continue;
 
     // Ghosts are only visible to other ghosts, or local player to themselves
     if (!p.isAlive && !isLocalGhost && p.id !== localPlayer.id) continue;
@@ -1820,11 +1844,12 @@ function drawDynamicLighting(
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2;
 
+  const isGhost = !localPlayer.isAlive;
   const isLightsOut = activeSabotage?.type === 'lights';
   const isAlarm = activeSabotage?.type === 'reactor' || activeSabotage?.type === 'o2';
 
-  // Vision Radius
-  const visionRadius = localPlayer.role === 'impostor'
+  // Vision Radius (Ghosts & Impostors have full vision!)
+  const visionRadius = (localPlayer.role === 'impostor' || isGhost)
     ? 380
     : isLightsOut
     ? 110
@@ -1846,8 +1871,8 @@ function drawDynamicLighting(
     grad.addColorStop(0, `rgba(239, 68, 68, ${0.12 * strobe})`);
     grad.addColorStop(0.7, `rgba(127, 29, 29, ${0.4 + 0.25 * strobe})`);
     grad.addColorStop(1, 'rgba(15, 23, 42, 0.96)');
-  } else if (isLightsOut && localPlayer.role !== 'impostor') {
-    // Heavy black darkness during blackout
+  } else if (isLightsOut && localPlayer.role !== 'impostor' && !isGhost) {
+    // Heavy black darkness during blackout for living crewmates
     grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
     grad.addColorStop(0.6, 'rgba(2, 6, 23, 0.85)');
     grad.addColorStop(1, 'rgba(2, 6, 23, 0.98)');

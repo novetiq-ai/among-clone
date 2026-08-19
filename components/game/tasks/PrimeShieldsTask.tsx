@@ -19,16 +19,12 @@ export function PrimeShieldsTask({ onComplete, onClose }: PrimeShieldsTaskProps)
 
   // 7 Hexagonal shield nodes: 0 is center, 1..6 are surrounding
   const [shields, setShields] = useState<boolean[]>(() => {
-    // Start with 2-4 deactivated shields (false = red, true = active cyan)
-    const initial = [false, false, false, false, false, false, false];
-    const activeCount = Math.floor(Math.random() * 2) + 1;
-    for (let i = 0; i < activeCount; i++) {
-      initial[Math.floor(Math.random() * 7)] = true;
-    }
-    // ensure at least 2 are deactivated
-    if (initial.filter((s) => s).length > 5) {
-      initial[0] = false;
-      initial[1] = false;
+    // Start with all 7 active (true), then deactivate 2 to 4 random shields (false)
+    const initial = [true, true, true, true, true, true, true];
+    const deactiveCount = Math.floor(Math.random() * 3) + 2; // 2, 3, or 4 deactivated
+    const indices = [0, 1, 2, 3, 4, 5, 6].sort(() => 0.5 - Math.random());
+    for (let i = 0; i < deactiveCount; i++) {
+      initial[indices[i]] = false;
     }
     return initial;
   });

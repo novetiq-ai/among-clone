@@ -297,7 +297,7 @@ export class NetworkManager {
       event: 'msg',
       payload: {
         senderId: this.localPlayerId,
-        recipientId: 'all',
+        recipientId: this.hostId || 'host',
         message,
       },
     });

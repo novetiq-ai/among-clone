@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Player,
   DeadBody,
@@ -220,9 +220,10 @@ export function GameCanvas({
     return () => clearInterval(timer);
   }, []);
 
-  // Position initialization & Vent jump handling (NEVER overwrite during normal walking)
+  // Position initialization & Vent jump / Teleport handling
   const initialMountRef = useRef(false);
   const prevVentIdRef = useRef(localPlayer.ventId);
+  const ventIndexRef = useRef(0);
 
   useEffect(() => {
     if (!initialMountRef.current) {
@@ -233,18 +234,43 @@ export function GameCanvas({
       return;
     }
 
-    // Only update position if vent state changed
+    // Update position if vent state changed
     if (localPlayer.inVent && localPlayer.ventId && localPlayer.ventId !== prevVentIdRef.current) {
       const v = VENTS.find((vent) => vent.id === localPlayer.ventId);
       if (v) {
         posRef.current = { x: v.x, y: v.y };
       }
+    } else if (localPlayer.x !== undefined && localPlayer.y !== undefined) {
+      // If server teleported player (e.g. match start, meeting return)
+      const distFromExpected = Math.hypot(posRef.current.x - localPlayer.x, posRef.current.y - localPlayer.y);
+      if (distFromExpected > 280) {
+        posRef.current = { x: localPlayer.x, y: localPlayer.y };
+      }
     }
     prevVentIdRef.current = localPlayer.ventId;
   }, [localPlayer.inVent, localPlayer.ventId, localPlayer.x, localPlayer.y]);
 
+  // Stop player movement immediately when opening any modal
+  useEffect(() => {
+    if (activeTask || showCCTV || showAdminRadar || showSabotageModal) {
+      keysPressed.current = {};
+      joystickVectorRef.current = { dx: 0, dy: 0, isMoving: false };
+      if (wasMovingRef.current) {
+        wasMovingRef.current = false;
+        onPlayerMoveRef.current(
+          posRef.current.x,
+          posRef.current.y,
+          facingRef.current,
+          false,
+          localPlayer.inVent,
+          localPlayer.ventId
+        );
+      }
+    }
+  }, [activeTask, showCCTV, showAdminRadar, showSabotageModal, localPlayer.inVent, localPlayer.ventId]);
+
   // Kill Action
-  const handleKill = () => {
+  const handleKill = useCallback(() => {
     if (!nearbyKillTarget || killCooldown > 0 || !localPlayer.isAlive || localPlayer.role !== 'impostor') return;
     setActiveKillOverlay({
       killerColor: localPlayer.color,
@@ -255,23 +281,23 @@ export function GameCanvas({
     });
     onKillPlayer(nearbyKillTarget.id, nearbyKillTarget.x, nearbyKillTarget.y);
     setKillCooldown(settings.killCooldown);
-  };
-
+  }, [nearbyKillTarget, killCooldown, localPlayer.isAlive, localPlayer.role, localPlayer.color, localPlayer.hat, onKillPlayer, settings.killCooldown]);
 
   // Vent Action Toggle (Enter / Exit)
-  const handleVentToggle = () => {
+  const handleVentToggle = useCallback(() => {
     if (localPlayer.role !== 'impostor' || !localPlayer.isAlive) return;
 
     if (localPlayer.inVent) {
       const activeVentId = localPlayer.ventId || (nearbyVent ? nearbyVent.id : undefined) || VENTS[0].id;
       onVentAction(activeVentId, 'exit');
     } else if (nearbyVent) {
+      ventIndexRef.current = 0;
       onVentAction(nearbyVent.id, 'enter');
     }
-  };
+  }, [localPlayer.role, localPlayer.isAlive, localPlayer.inVent, localPlayer.ventId, nearbyVent, onVentAction]);
 
   // Travel between connected vents
-  const handleTravelVent = (targetVentId: string) => {
+  const handleTravelVent = useCallback((targetVentId: string) => {
     if (!localPlayer.inVent) return;
     const currentVentId = localPlayer.ventId || (nearbyVent ? nearbyVent.id : undefined);
     if (!currentVentId) return;
@@ -280,15 +306,15 @@ export function GameCanvas({
 
     posRef.current = { x: targetVent.x, y: targetVent.y };
     onVentAction(currentVentId, 'travel', targetVentId);
-  };
+  }, [localPlayer.inVent, localPlayer.ventId, nearbyVent, onVentAction]);
 
   // Toggle CCTV and notify peers
-  const handleToggleCCTV = (open: boolean) => {
+  const handleToggleCCTV = useCallback((open: boolean) => {
     setShowCCTV(open);
     if (onSecurityCamToggle) {
       onSecurityCamToggle(open);
     }
-  };
+  }, [onSecurityCamToggle]);
 
   // Keyboard Event Listeners
   useEffect(() => {
@@ -316,30 +342,35 @@ export function GameCanvas({
 
         // 1, 2, 3 to travel to connected vents
         if (currVent && currVent.connectedVents.length > 0) {
+          const numVents = currVent.connectedVents.length;
           if (e.key === '1' && currVent.connectedVents[0]) {
             e.preventDefault();
+            ventIndexRef.current = 0;
             handleTravelVent(currVent.connectedVents[0]);
             return;
           }
           if (e.key === '2' && currVent.connectedVents[1]) {
             e.preventDefault();
+            ventIndexRef.current = 1;
             handleTravelVent(currVent.connectedVents[1]);
             return;
           }
           if (e.key === '3' && currVent.connectedVents[2]) {
             e.preventDefault();
+            ventIndexRef.current = 2;
             handleTravelVent(currVent.connectedVents[2]);
             return;
           }
           if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
             e.preventDefault();
-            handleTravelVent(currVent.connectedVents[0]);
+            ventIndexRef.current = (ventIndexRef.current + 1) % numVents;
+            handleTravelVent(currVent.connectedVents[ventIndexRef.current]);
             return;
           }
           if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
             e.preventDefault();
-            const lastTarget = currVent.connectedVents[currVent.connectedVents.length - 1];
-            handleTravelVent(lastTarget);
+            ventIndexRef.current = (ventIndexRef.current - 1 + numVents) % numVents;
+            handleTravelVent(currVent.connectedVents[ventIndexRef.current]);
             return;
           }
         }
@@ -404,13 +435,56 @@ export function GameCanvas({
       keysPressed.current[e.key.toLowerCase()] = false;
     };
 
+    const handleBlur = () => {
+      keysPressed.current = {};
+      joystickVectorRef.current = { dx: 0, dy: 0, isMoving: false };
+      if (wasMovingRef.current) {
+        wasMovingRef.current = false;
+        onPlayerMoveRef.current(
+          posRef.current.x,
+          posRef.current.y,
+          facingRef.current,
+          false,
+          localPlayer.inVent,
+          localPlayer.ventId
+        );
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
-  });
+  }, [
+    activeTask,
+    showCCTV,
+    showAdminRadar,
+    showSabotageModal,
+    localPlayer.inVent,
+    localPlayer.role,
+    localPlayer.ventId,
+    localPlayer.isAlive,
+    nearbyVent,
+    nearbyEmergencyButton,
+    nearbyFixSabotage,
+    nearbySecurityDesk,
+    nearbyAdminTable,
+    nearbyTask,
+    nearbyKillTarget,
+    nearbyDeadBody,
+    killCooldown,
+    onEmergencyMeeting,
+    onFixSabotage,
+    onReportBody,
+    handleKill,
+    handleVentToggle,
+    handleTravelVent,
+    handleToggleCCTV,
+  ]);
 
   // Main Render & Physics Loop (Runs continuously without stutter or re-mount resets)
   useEffect(() => {
@@ -534,18 +608,21 @@ export function GameCanvas({
           const distToAdminTable = Math.hypot(currentX - 1650, currentY - 1040);
           setNearbyAdminTable(distToAdminTable < 80 && localP.isAlive && !localP.inVent);
 
-          // Emergency Sabotage Fix Proximity
+          // Emergency Sabotage Fix Proximity (Both Consoles for O2 & Reactor)
           let nearbySab: SabotageType | null = null;
           if (curActiveSab && localP.isAlive && !localP.inVent) {
             if (curActiveSab.type === 'lights') {
               const d = Math.hypot(currentX - 670, currentY - 960);
               if (d < 85) nearbySab = 'lights';
             } else if (curActiveSab.type === 'reactor') {
-              const d = Math.hypot(currentX - 140, currentY - 720);
-              if (d < 85) nearbySab = 'reactor';
+              const dTop = Math.hypot(currentX - 140, currentY - 620);
+              const dBottom = Math.hypot(currentX - 140, currentY - 820);
+              const dCenter = Math.hypot(currentX - 140, currentY - 720);
+              if (dTop < 85 || dBottom < 85 || dCenter < 85) nearbySab = 'reactor';
             } else if (curActiveSab.type === 'o2') {
-              const d = Math.hypot(currentX - 1740, currentY - 800);
-              if (d < 85) nearbySab = 'o2';
+              const dO2Room = Math.hypot(currentX - 1740, currentY - 800);
+              const dAdminRoom = Math.hypot(currentX - 1620, currentY - 1080);
+              if (dO2Room < 85 || dAdminRoom < 85) nearbySab = 'o2';
             } else if (curActiveSab.type === 'comms') {
               const d = Math.hypot(currentX - 1480, currentY - 1400);
               if (d < 85) nearbySab = 'comms';
@@ -598,7 +675,7 @@ export function GameCanvas({
           }
           setNearbyKillTarget(foundKillTarget);
 
-          // Vent Proximity
+          // Vent Proximity (Impostors only)
           let foundVent: VentDefinition | null = null;
           if (localP.role === 'impostor' && localP.isAlive) {
             if (localP.inVent && localP.ventId) {
@@ -616,6 +693,13 @@ export function GameCanvas({
           setNearbyVent(foundVent);
 
           // 3. Smooth Interpolation (Lerp) for Remote Players
+          const activePeerIds = new Set(Object.keys(curAllPlayers));
+          for (const cachedId of Object.keys(lerpedPositions.current)) {
+            if (!activePeerIds.has(cachedId)) {
+              delete lerpedPositions.current[cachedId];
+            }
+          }
+
           const renderedPlayers: Record<string, Player> = {};
           for (const p of Object.values(curAllPlayers)) {
             if (p.id === localPlayerId) {
@@ -630,9 +714,16 @@ export function GameCanvas({
                 lerpedPositions.current[p.id] = { x: p.x, y: p.y };
               }
               const lp = lerpedPositions.current[p.id];
-              // Smooth lerp towards target coordinates
-              lp.x += (p.x - lp.x) * Math.min(1, delta * 20);
-              lp.y += (p.y - lp.y) * Math.min(1, delta * 20);
+              const distFromTarget = Math.hypot(p.x - lp.x, p.y - lp.y);
+
+              // If distance is large (teleport/spawn/vent exit), snap immediately without gliding through walls
+              if (distFromTarget > 250) {
+                lp.x = p.x;
+                lp.y = p.y;
+              } else {
+                lp.x += (p.x - lp.x) * Math.min(1, delta * 20);
+                lp.y += (p.y - lp.y) * Math.min(1, delta * 20);
+              }
 
               renderedPlayers[p.id] = {
                 ...p,

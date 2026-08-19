@@ -102,10 +102,17 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
 
     if (connectedRightId) {
       sound.playShieldClick();
-      setConnections((prev) => ({
-        ...prev,
-        [draggingLeftId]: connectedRightId!,
-      }));
+      setConnections((prev) => {
+        const next = { ...prev };
+        // Disallow duplicate pins: remove any other wire that was on this right pin
+        for (const [leftKey, rightKey] of Object.entries(next)) {
+          if (rightKey === connectedRightId) {
+            delete next[leftKey];
+          }
+        }
+        next[draggingLeftId] = connectedRightId!;
+        return next;
+      });
     } else {
       setConnections((prev) => {
         const next = { ...prev };
