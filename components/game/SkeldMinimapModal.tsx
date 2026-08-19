@@ -94,25 +94,25 @@ export function SkeldMinimapModal({ localPlayer, onClose }: SkeldMinimapModalPro
               </filter>
             </defs>
 
-            {/* 1. Spaceship Outer Silhouette Contour */}
+            {/* 1. Outer Ship Hull Blueprint Outline */}
             <path
               d="
-                M 80 440
-                L 260 360
-                L 620 360
-                L 920 460
-                L 1580 360
-                L 1980 360
-                L 2040 440
-                L 2320 660
-                L 2320 1060
-                L 2040 1280
-                L 1640 1440
+                M 60 580
+                L 240 320
+                L 600 320
+                L 920 380
+                L 1480 380
+                L 1600 300
+                L 1980 300
+                L 2380 620
+                L 2380 1060
+                L 1980 1480
+                L 1600 1480
                 L 1260 1480
                 L 900 1480
-                L 620 1440
-                L 260 1440
-                L 80 1200
+                L 600 1440
+                L 240 1440
+                L 60 1100
                 Z
               "
               fill="#060c18"
@@ -221,14 +221,26 @@ export function SkeldMinimapModal({ localPlayer, onClose }: SkeldMinimapModalPro
             {/* 5. Impostor Vent Network (Visible only to Impostors) */}
             {localPlayer.role === 'impostor' && (
               <g filter="url(#vent-glow)">
-                {/* Connecting Vent Pipelines */}
-                <line x1="700" y1="430" x2="700" y2="870" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
-                <line x1="700" y1="870" x2="700" y2="1210" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
-                <line x1="160" y1="680" x2="540" y2="430" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
-                <line x1="160" y1="1010" x2="540" y2="1360" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
-                <line x1="1660" y1="430" x2="2220" y2="730" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
-                <line x1="1660" y1="1340" x2="2220" y2="990" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
-                <line x1="1760" y1="1140" x2="1440" y2="880" stroke="#ef4444" strokeWidth="8" strokeDasharray="18,12" opacity="0.85" />
+                {/* Connecting Vent Pipelines (Dynamically connected between paired/triangle vents) */}
+                {VENTS.map((v) =>
+                  v.connectedVents.map((targetId) => {
+                    const target = VENTS.find((o) => o.id === targetId);
+                    if (!target || v.id > target.id) return null;
+                    return (
+                      <line
+                        key={`minimap-vent-line-${v.id}-${target.id}`}
+                        x1={v.x}
+                        y1={v.y}
+                        x2={target.x}
+                        y2={target.y}
+                        stroke="#ef4444"
+                        strokeWidth="8"
+                        strokeDasharray="18,12"
+                        opacity="0.85"
+                      />
+                    );
+                  })
+                )}
 
                 {/* Vent Markers */}
                 {VENTS.map((v) => (
