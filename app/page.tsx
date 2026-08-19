@@ -14,7 +14,7 @@ import {
   DeadBody,
   EjectionData,
 } from '@/types/game';
-import { ALL_TASKS, SPAWN_POSITION, getSpawnPosition, WAYPOINTS, findBotPath, getNearestWaypoint } from '@/lib/map-data';
+import { ALL_TASKS, SPAWN_POSITION, getSpawnPosition, WAYPOINTS, findBotPath, getNearestWaypoint, VENTS } from '@/lib/map-data';
 import { NetworkManager, generateRoomCode } from '@/lib/peer';
 import { sound, playSabotageAlarm, playDoorLock } from '@/lib/sound';
 import { MainMenu } from '@/components/MainMenu';
@@ -392,16 +392,42 @@ function AmongUsApp() {
             const player = newState.players[msg.playerId];
             if (player) {
               sound.playVentWhoosh();
+              const activeVentId = msg.action === 'travel' && msg.targetVentId ? msg.targetVentId : msg.ventId;
+              const vent = VENTS.find((v) => v.id === activeVentId);
+
               if (msg.action === 'enter') {
                 player.inVent = true;
                 player.ventId = msg.ventId;
+                if (vent) {
+                  player.x = vent.x;
+                  player.y = vent.y;
+                }
               } else if (msg.action === 'exit') {
                 player.inVent = false;
                 player.ventId = undefined;
+                if (vent) {
+                  player.x = vent.x;
+                  player.y = vent.y;
+                }
               } else if (msg.action === 'travel' && msg.targetVentId) {
                 player.inVent = true;
                 player.ventId = msg.targetVentId;
+                if (vent) {
+                  player.x = vent.x;
+                  player.y = vent.y;
+                }
               }
+
+              if (msg.playerId === localPlayerId) {
+                setLocalPlayer((prev) => ({
+                  ...prev,
+                  inVent: player.inVent,
+                  ventId: player.ventId,
+                  x: player.x,
+                  y: player.y,
+                }));
+              }
+
               networkRef.current?.broadcast({
                 type: 'STATE_SYNC',
                 gameState: newState,
@@ -1633,6 +1659,25 @@ function AmongUsApp() {
   };
 
   const handleVentAction = (ventId: string, action: 'enter' | 'exit' | 'travel', targetVentId?: string) => {
+    const activeVentId = action === 'travel' && targetVentId ? targetVentId : ventId;
+    const targetVent = VENTS.find((v) => v.id === activeVentId);
+    const targetX = targetVent ? targetVent.x : localPlayer.x;
+    const targetY = targetVent ? targetVent.y : localPlayer.y;
+
+    const inVent = action !== 'exit';
+    const ventIdentifier = action === 'exit' ? undefined : activeVentId;
+
+    // Immediately update local player state for instant responsiveness
+    setLocalPlayer((prev) => ({
+      ...prev,
+      x: targetX,
+      y: targetY,
+      inVent,
+      ventId: ventIdentifier,
+    }));
+
+    sound.playVentWhoosh();
+
     if (isHost) {
       handleHostNetworkMessage(
         { type: 'VENT_ACTION', playerId: localPlayerId, ventId, action, targetVentId },
@@ -1645,6 +1690,16 @@ function AmongUsApp() {
         ventId,
         action,
         targetVentId,
+      });
+      networkRef.current?.sendToHost({
+        type: 'PLAYER_MOVE',
+        playerId: localPlayerId,
+        x: targetX,
+        y: targetY,
+        facing: localPlayer.facing,
+        isMoving: false,
+        inVent,
+        ventId: ventIdentifier,
       });
     }
   };

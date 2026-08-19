@@ -178,8 +178,15 @@ export function GameCanvas({
 
   // Sync positions from props
   useEffect(() => {
-    posRef.current = { x: localPlayer.x, y: localPlayer.y };
-  }, [localPlayer.x, localPlayer.y]);
+    if (localPlayer.inVent && localPlayer.ventId) {
+      const v = VENTS.find((vent) => vent.id === localPlayer.ventId);
+      if (v) {
+        posRef.current = { x: v.x, y: v.y };
+      }
+    } else if (localPlayer.x !== undefined && localPlayer.y !== undefined) {
+      posRef.current = { x: localPlayer.x, y: localPlayer.y };
+    }
+  }, [localPlayer.x, localPlayer.y, localPlayer.inVent, localPlayer.ventId]);
 
   // Kill Action
   const handleKill = () => {
@@ -196,14 +203,13 @@ export function GameCanvas({
   };
 
 
-  // Vent Action
+  // Vent Action Toggle (Enter / Exit)
   const handleVentToggle = () => {
     if (localPlayer.role !== 'impostor' || !localPlayer.isAlive) return;
 
     if (localPlayer.inVent) {
-      if (localPlayer.ventId) {
-        onVentAction(localPlayer.ventId, 'exit');
-      }
+      const activeVentId = localPlayer.ventId || (nearbyVent ? nearbyVent.id : undefined) || VENTS[0].id;
+      onVentAction(activeVentId, 'exit');
     } else if (nearbyVent) {
       onVentAction(nearbyVent.id, 'enter');
     }
@@ -211,12 +217,14 @@ export function GameCanvas({
 
   // Travel between connected vents
   const handleTravelVent = (targetVentId: string) => {
-    if (!localPlayer.inVent || !localPlayer.ventId) return;
+    if (!localPlayer.inVent) return;
+    const currentVentId = localPlayer.ventId || (nearbyVent ? nearbyVent.id : undefined);
+    if (!currentVentId) return;
     const targetVent = VENTS.find((v) => v.id === targetVentId);
     if (!targetVent) return;
 
     posRef.current = { x: targetVent.x, y: targetVent.y };
-    onVentAction(localPlayer.ventId, 'travel', targetVentId);
+    onVentAction(currentVentId, 'travel', targetVentId);
   };
 
   // Toggle CCTV and notify peers
@@ -238,6 +246,48 @@ export function GameCanvas({
           setShowSabotageModal(false);
         }
         return;
+      }
+
+      // Handle in-vent keyboard controls
+      if (localPlayer.inVent && localPlayer.role === 'impostor') {
+        const currVent = localPlayer.ventId ? VENTS.find((v) => v.id === localPlayer.ventId) : nearbyVent;
+
+        // V, Space, E, or Escape to exit vent
+        if (e.key.toLowerCase() === 'v' || e.key === ' ' || e.key.toLowerCase() === 'e' || e.key === 'Escape') {
+          e.preventDefault();
+          handleVentToggle();
+          return;
+        }
+
+        // 1, 2, 3 to travel to connected vents
+        if (currVent && currVent.connectedVents.length > 0) {
+          if (e.key === '1' && currVent.connectedVents[0]) {
+            e.preventDefault();
+            handleTravelVent(currVent.connectedVents[0]);
+            return;
+          }
+          if (e.key === '2' && currVent.connectedVents[1]) {
+            e.preventDefault();
+            handleTravelVent(currVent.connectedVents[1]);
+            return;
+          }
+          if (e.key === '3' && currVent.connectedVents[2]) {
+            e.preventDefault();
+            handleTravelVent(currVent.connectedVents[2]);
+            return;
+          }
+          if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+            e.preventDefault();
+            handleTravelVent(currVent.connectedVents[0]);
+            return;
+          }
+          if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            const lastTarget = currVent.connectedVents[currVent.connectedVents.length - 1];
+            handleTravelVent(lastTarget);
+            return;
+          }
+        }
       }
 
       keysPressed.current[e.key.toLowerCase()] = true;
@@ -484,11 +534,15 @@ export function GameCanvas({
           // Vent Proximity
           let foundVent: VentDefinition | null = null;
           if (localPlayer.role === 'impostor' && localPlayer.isAlive) {
-            for (const v of VENTS) {
-              const d = Math.hypot(currentX - v.x, currentY - v.y);
-              if (d < 80) {
-                foundVent = v;
-                break;
+            if (localPlayer.inVent && localPlayer.ventId) {
+              foundVent = VENTS.find((v) => v.id === localPlayer.ventId) || null;
+            } else {
+              for (const v of VENTS) {
+                const d = Math.hypot(currentX - v.x, currentY - v.y);
+                if (d < 85) {
+                  foundVent = v;
+                  break;
+                }
               }
             }
           }
@@ -560,7 +614,12 @@ export function GameCanvas({
   }, []);
 
   const progressPercent = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
-  const currentVent = localPlayer.inVent && localPlayer.ventId ? VENTS.find((v) => v.id === localPlayer.ventId) : null;
+  const currentVent =
+    localPlayer.inVent && localPlayer.ventId
+      ? VENTS.find((v) => v.id === localPlayer.ventId)
+      : localPlayer.inVent && nearbyVent
+      ? nearbyVent
+      : null;
 
   return (
     <div
@@ -722,25 +781,39 @@ export function GameCanvas({
       </div>
 
       {/* Vent Navigation UI (When Impostor is inside a Vent) */}
-      {localPlayer.inVent && currentVent && (
-        <div className="absolute inset-x-0 bottom-28 flex justify-center items-center gap-4 z-40 px-4">
-          <div className="bg-slate-900/95 border-2 border-red-500 rounded-3xl p-3 sm:p-4 shadow-2xl flex flex-wrap items-center justify-center gap-3 max-w-md">
-            <span className="font-mono text-xs text-red-400 font-bold uppercase block w-full text-center">
-              LÜFTUNGSSCHACHT ({currentVent.room}):
-            </span>
-            {currentVent.connectedVents.map((targetId) => {
-              const targetVent = VENTS.find((v) => v.id === targetId);
-              if (!targetVent) return null;
-              return (
-                <button
-                  key={targetId}
-                  onClick={() => handleTravelVent(targetId)}
-                  className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold uppercase shadow cursor-pointer transition-all active:scale-95 min-h-[40px]"
-                >
-                  &rarr; {targetVent.room}
-                </button>
-              );
-            })}
+      {localPlayer.inVent && (
+        <div className="absolute inset-x-0 bottom-24 sm:bottom-28 flex justify-center items-center gap-4 z-40 px-4 pointer-events-auto">
+          <div className="bg-slate-950/95 border-2 border-red-500/90 rounded-3xl p-4 sm:p-5 shadow-2xl shadow-red-950/80 flex flex-col items-center justify-center gap-3 max-w-lg backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between w-full border-b border-red-900/50 pb-2">
+              <span className="font-mono text-xs sm:text-sm text-red-400 font-black uppercase flex items-center gap-2">
+                <span className="text-base">🕳️</span> SCHACHT: {currentVent ? currentVent.room : 'Unbekannt'}
+              </span>
+              <button
+                type="button"
+                onClick={handleVentToggle}
+                className="px-2.5 py-1 rounded-lg bg-red-950/80 border border-red-500/50 hover:bg-red-900 text-red-300 font-mono text-[11px] font-bold uppercase transition-all cursor-pointer hover:scale-105 active:scale-95"
+              >
+                ✕ VERLASSEN [V / ESC]
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
+              {currentVent?.connectedVents.map((targetId, idx) => {
+                const targetVent = VENTS.find((v) => v.id === targetId);
+                if (!targetVent) return null;
+                return (
+                  <button
+                    key={targetId}
+                    type="button"
+                    onClick={() => handleTravelVent(targetId)}
+                    className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-mono text-xs font-black uppercase shadow-lg shadow-red-950/50 cursor-pointer transition-all hover:scale-105 active:scale-95 flex items-center gap-2 border border-red-400/40"
+                  >
+                    <span className="bg-red-900/80 px-1.5 py-0.5 rounded text-[10px]">[{idx + 1}]</span>
+                    <span>➔ {targetVent.room}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

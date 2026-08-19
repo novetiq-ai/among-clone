@@ -1054,25 +1054,31 @@ function drawEmergencyButton(ctx: CanvasRenderingContext2D, localPlayer: Player,
 
 // Impostor Vents
 function drawVents(ctx: CanvasRenderingContext2D, localPlayer: Player, time: number) {
+  const isImpostor = localPlayer.role === 'impostor' && localPlayer.isAlive;
+  const isLocalInVent = isImpostor && !!localPlayer.inVent;
+  const currentVent = isLocalInVent && localPlayer.ventId ? VENTS.find((v) => v.id === localPlayer.ventId) : null;
+
   for (const vent of VENTS) {
+    const isCurrentVent = isLocalInVent && vent.id === localPlayer.ventId;
+    const isConnectedToCurrent = isLocalInVent && currentVent?.connectedVents.includes(vent.id);
     const dist = Math.hypot(localPlayer.x - vent.x, localPlayer.y - vent.y);
-    const isNear = dist < 80 && localPlayer.role === 'impostor' && localPlayer.isAlive;
+    const isNear = !isLocalInVent && dist < 85 && isImpostor;
 
     // Vent Outer Steel Plate
     ctx.fillStyle = '#1e293b';
     ctx.beginPath();
     ctx.roundRect(vent.x - 24, vent.y - 18, 48, 36, 6);
     ctx.fill();
-    ctx.strokeStyle = isNear ? '#ef4444' : '#0f172a';
-    ctx.lineWidth = isNear ? 3.5 : 2.5;
+    ctx.strokeStyle = isCurrentVent || isConnectedToCurrent || isNear ? '#ef4444' : '#0f172a';
+    ctx.lineWidth = isCurrentVent ? 4 : isConnectedToCurrent || isNear ? 3.5 : 2.5;
     ctx.stroke();
 
     // Dark Vent Cavity
-    ctx.fillStyle = '#090d16';
+    ctx.fillStyle = isCurrentVent ? '#3b0707' : '#090d16';
     ctx.fillRect(vent.x - 20, vent.y - 14, 40, 28);
 
     // Metal Grate Slats
-    ctx.strokeStyle = isNear ? '#f87171' : '#475569';
+    ctx.strokeStyle = isCurrentVent ? '#fca5a5' : isConnectedToCurrent || isNear ? '#f87171' : '#475569';
     ctx.lineWidth = 2.5;
     for (let dy = -10; dy <= 10; dy += 5) {
       ctx.beginPath();
@@ -1081,8 +1087,31 @@ function drawVents(ctx: CanvasRenderingContext2D, localPlayer: Player, time: num
       ctx.stroke();
     }
 
-    // Impostor Vent Prompt
-    if (isNear) {
+    // Interactive Visual Highlights & Prompts
+    if (isCurrentVent) {
+      // Glow under player in vent
+      drawGlowCircle(ctx, vent.x, vent.y, 30, 'rgba(239, 68, 68, 0.5)', 20);
+      ctx.save();
+      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
+      ctx.fillStyle = '#fca5a5';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 5;
+      ctx.fillText('EXIT [V / ESC]', vent.x, vent.y - 26);
+      ctx.restore();
+    } else if (isConnectedToCurrent) {
+      // Flashing directional marker for travel targets
+      const pulse = Math.sin(time / 150) * 0.2 + 0.8;
+      drawGlowCircle(ctx, vent.x, vent.y, 24, `rgba(239, 68, 68, ${0.4 * pulse})`, 16);
+      ctx.save();
+      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
+      ctx.fillStyle = '#ef4444';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 5;
+      ctx.fillText(`➔ ${vent.room}`, vent.x, vent.y - 26);
+      ctx.restore();
+    } else if (isNear) {
       drawGlowCircle(ctx, vent.x, vent.y, 26, 'rgba(239, 68, 68, 0.35)', 16);
       ctx.save();
       ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
