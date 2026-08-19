@@ -527,10 +527,40 @@ function AmongUsApp() {
         }
 
         case 'STATE_SYNC': {
-          setGameState(msg.gameState);
+          setGameState((prevState) => {
+            const newPlayers = { ...msg.gameState.players };
+            // If currently in playing phase, preserve our live coordinates in local gameState
+            if (msg.gameState.phase === 'playing' && localPlayerId && prevState.players[localPlayerId]) {
+              newPlayers[localPlayerId] = {
+                ...newPlayers[localPlayerId],
+                x: prevState.players[localPlayerId].x,
+                y: prevState.players[localPlayerId].y,
+                facing: prevState.players[localPlayerId].facing,
+                isMoving: prevState.players[localPlayerId].isMoving,
+              };
+            }
+            return {
+              ...msg.gameState,
+              players: newPlayers,
+            };
+          });
+
           setLocalPlayerId((id) => {
             if (id && msg.gameState.players[id]) {
-              setLocalPlayer(msg.gameState.players[id]);
+              const serverP = msg.gameState.players[id];
+              setLocalPlayer((curr) => {
+                // If in active playing phase, preserve local player live movement
+                if (msg.gameState.phase === 'playing' && curr.id === id) {
+                  return {
+                    ...serverP,
+                    x: curr.x,
+                    y: curr.y,
+                    facing: curr.facing,
+                    isMoving: curr.isMoving,
+                  };
+                }
+                return serverP;
+              });
             }
             return id;
           });
@@ -538,6 +568,7 @@ function AmongUsApp() {
         }
 
         case 'PLAYER_MOVE': {
+          if (msg.playerId === localPlayerId) break;
           setGameState((prev) => {
             if (prev.players[msg.playerId]) {
               return {

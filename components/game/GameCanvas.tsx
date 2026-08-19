@@ -130,7 +130,38 @@ export function GameCanvas({
   const keysPressed = useRef<Record<string, boolean>>({});
   const joystickVectorRef = useRef<{ dx: number; dy: number; isMoving: boolean }>({ dx: 0, dy: 0, isMoving: false });
   const lastSyncTime = useRef<number>(0);
+  const wasMovingRef = useRef<boolean>(false);
   const prevAliveRef = useRef(localPlayer.isAlive);
+  const lerpedPositions = useRef<Record<string, { x: number; y: number }>>({});
+
+  // Dynamic props kept in refs for silky-smooth 60fps render loop
+  const playersRef = useRef(players);
+  const localPlayerRef = useRef(localPlayer);
+  const deadBodiesRef = useRef(deadBodies);
+  const lockedDoorsRef = useRef(lockedDoors);
+  const activeSabotageRef = useRef(activeSabotage);
+  const isSecurityCamActiveRef = useRef(isSecurityCamActive);
+  const activeTaskRef = useRef(activeTask);
+  const showCCTVRef = useRef(showCCTV);
+  const showAdminRadarRef = useRef(showAdminRadar);
+  const showSabotageModalRef = useRef(showSabotageModal);
+  const settingsRef = useRef(settings);
+  const onPlayerMoveRef = useRef(onPlayerMove);
+
+  useEffect(() => {
+    playersRef.current = players;
+    localPlayerRef.current = localPlayer;
+    deadBodiesRef.current = deadBodies;
+    lockedDoorsRef.current = lockedDoors;
+    activeSabotageRef.current = activeSabotage;
+    isSecurityCamActiveRef.current = isSecurityCamActive;
+    activeTaskRef.current = activeTask;
+    showCCTVRef.current = showCCTV;
+    showAdminRadarRef.current = showAdminRadar;
+    showSabotageModalRef.current = showSabotageModal;
+    settingsRef.current = settings;
+    onPlayerMoveRef.current = onPlayerMove;
+  });
 
   // Detect if local player was killed
   useEffect(() => {
@@ -184,17 +215,28 @@ export function GameCanvas({
     setEmergencyCooldown(15);
   }, [settings.killCooldown, localPlayer.role]);
 
-  // Sync positions from props
+  // Position initialization & Vent jump handling (NEVER overwrite during normal walking)
+  const initialMountRef = useRef(false);
+  const prevVentIdRef = useRef(localPlayer.ventId);
+
   useEffect(() => {
-    if (localPlayer.inVent && localPlayer.ventId) {
+    if (!initialMountRef.current) {
+      initialMountRef.current = true;
+      if (localPlayer.x !== undefined && localPlayer.y !== undefined) {
+        posRef.current = { x: localPlayer.x, y: localPlayer.y };
+      }
+      return;
+    }
+
+    // Only update position if vent state changed
+    if (localPlayer.inVent && localPlayer.ventId && localPlayer.ventId !== prevVentIdRef.current) {
       const v = VENTS.find((vent) => vent.id === localPlayer.ventId);
       if (v) {
         posRef.current = { x: v.x, y: v.y };
       }
-    } else if (localPlayer.x !== undefined && localPlayer.y !== undefined) {
-      posRef.current = { x: localPlayer.x, y: localPlayer.y };
     }
-  }, [localPlayer.x, localPlayer.y, localPlayer.inVent, localPlayer.ventId]);
+    prevVentIdRef.current = localPlayer.ventId;
+  }, [localPlayer.inVent, localPlayer.ventId]);
 
   // Kill Action
   const handleKill = () => {
@@ -365,23 +407,25 @@ export function GameCanvas({
     };
   });
 
-  // Main Render & Physics Loop
+  // Main Render & Physics Loop (Runs continuously without stutter or re-mount resets)
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
 
     const loop = (time: number) => {
-      const delta = (time - lastTime) / 1000;
+      const delta = Math.min(0.1, (time - lastTime) / 1000);
       lastTime = time;
 
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          const isInteracting = !!activeTask || showCCTV || showAdminRadar || showSabotageModal;
+          const isInteracting = !!activeTaskRef.current || showCCTVRef.current || showAdminRadarRef.current || showSabotageModalRef.current;
+          const localP = localPlayerRef.current;
+          const curSettings = settingsRef.current;
 
-          // 1. Process Movement with Sub-Stepping Physics
-          if (localPlayer.isAlive && !isInteracting && !localPlayer.inVent) {
+          // 1. Process Movement with Sub-Stepping Physics (Living players & Ghosts)
+          if (!isInteracting && !localP.inVent) {
             let dx = 0;
             let dy = 0;
 
@@ -407,13 +451,14 @@ export function GameCanvas({
             const isMoving = dx !== 0 || dy !== 0;
 
             if (isMoving) {
+              wasMovingRef.current = true;
               const mag = Math.hypot(dx, dy);
               if (mag > 1) {
                 dx /= mag;
                 dy /= mag;
               }
 
-              const baseSpeed = 260 * settings.playerSpeed;
+              const baseSpeed = 260 * curSettings.playerSpeed;
               const moveX = dx * baseSpeed * delta;
               const moveY = dy * baseSpeed * delta;
 
@@ -424,33 +469,35 @@ export function GameCanvas({
                 moveX,
                 moveY,
                 16,
-                !localPlayer.isAlive,
-                lockedDoors
+                !localP.isAlive,
+                lockedDoorsRef.current
               );
 
               posRef.current.x = resolved.x;
               posRef.current.y = resolved.y;
 
-              if (time - lastSyncTime.current > 40) {
+              if (time - lastSyncTime.current > 50) {
                 lastSyncTime.current = time;
-                onPlayerMove(
+                onPlayerMoveRef.current(
                   posRef.current.x,
                   posRef.current.y,
                   facingRef.current,
                   true,
-                  localPlayer.inVent,
-                  localPlayer.ventId
+                  localP.inVent,
+                  localP.ventId
                 );
               }
-            } else if (time - lastSyncTime.current > 150) {
+            } else if (wasMovingRef.current) {
+              // Send final stop moving update once
+              wasMovingRef.current = false;
               lastSyncTime.current = time;
-              onPlayerMove(
+              onPlayerMoveRef.current(
                 posRef.current.x,
                 posRef.current.y,
                 facingRef.current,
                 false,
-                localPlayer.inVent,
-                localPlayer.ventId
+                localP.inVent,
+                localP.ventId
               );
             }
           }
@@ -458,40 +505,43 @@ export function GameCanvas({
           // 2. Check Proximity to Entities & Consoles
           const currentX = posRef.current.x;
           const currentY = posRef.current.y;
+          const curActiveSab = activeSabotageRef.current;
+          const curDeadBodies = deadBodiesRef.current;
+          const curLockedDoors = lockedDoorsRef.current;
 
           // Emergency Button Proximity in Cafeteria (Blocked during active Sabotage Crisis or on cooldown)
           const distToEmergency = Math.hypot(currentX - EMERGENCY_BUTTON_POS.x, currentY - EMERGENCY_BUTTON_POS.y);
-          const hasEmergencyMeetingsLeft = (localPlayer.emergencyMeetingsLeft ?? settings.emergencyMeetings) > 0;
+          const hasEmergencyMeetingsLeft = (localP.emergencyMeetingsLeft ?? curSettings.emergencyMeetings) > 0;
           setNearbyEmergencyButton(
             distToEmergency < 90 &&
-            localPlayer.isAlive &&
-            !localPlayer.inVent &&
-            !activeSabotage &&
+            localP.isAlive &&
+            !localP.inVent &&
+            !curActiveSab &&
             emergencyCooldown === 0 &&
             hasEmergencyMeetingsLeft
           );
 
           // Security CCTV Console Proximity
           const distToSecurityDesk = Math.hypot(currentX - 740, currentY - 750);
-          setNearbySecurityDesk(distToSecurityDesk < 75 && localPlayer.isAlive && !localPlayer.inVent);
+          setNearbySecurityDesk(distToSecurityDesk < 75 && localP.isAlive && !localP.inVent);
 
           // Admin Radar Table Proximity
           const distToAdminTable = Math.hypot(currentX - 1650, currentY - 1040);
-          setNearbyAdminTable(distToAdminTable < 80 && localPlayer.isAlive && !localPlayer.inVent);
+          setNearbyAdminTable(distToAdminTable < 80 && localP.isAlive && !localP.inVent);
 
           // Emergency Sabotage Fix Proximity
           let nearbySab: SabotageType | null = null;
-          if (activeSabotage && localPlayer.isAlive && !localPlayer.inVent) {
-            if (activeSabotage.type === 'lights') {
+          if (curActiveSab && localP.isAlive && !localP.inVent) {
+            if (curActiveSab.type === 'lights') {
               const d = Math.hypot(currentX - 670, currentY - 960);
               if (d < 85) nearbySab = 'lights';
-            } else if (activeSabotage.type === 'reactor') {
+            } else if (curActiveSab.type === 'reactor') {
               const d = Math.hypot(currentX - 140, currentY - 720);
               if (d < 85) nearbySab = 'reactor';
-            } else if (activeSabotage.type === 'o2') {
+            } else if (curActiveSab.type === 'o2') {
               const d = Math.hypot(currentX - 1740, currentY - 800);
               if (d < 85) nearbySab = 'o2';
-            } else if (activeSabotage.type === 'comms') {
+            } else if (curActiveSab.type === 'comms') {
               const d = Math.hypot(currentX - 1480, currentY - 1400);
               if (d < 85) nearbySab = 'comms';
             }
@@ -500,9 +550,9 @@ export function GameCanvas({
 
           // Task Proximity (Living Crewmates and Dead Ghosts can do tasks)
           let foundTask: TaskDefinition | null = null;
-          if (!localPlayer.inVent) {
+          if (!localP.inVent) {
             for (const t of ALL_TASKS) {
-              if (localPlayer.assignedTasks.includes(t.id) && !localPlayer.completedTasks.includes(t.id)) {
+              if (localP.assignedTasks.includes(t.id) && !localP.completedTasks.includes(t.id)) {
                 const d = Math.hypot(currentX - t.x, currentY - t.y);
                 if (d < 75) {
                   foundTask = t;
@@ -515,11 +565,11 @@ export function GameCanvas({
 
           // Dead Body Proximity (Requires living player + Line of Sight)
           let foundBody: DeadBody | null = null;
-          if (localPlayer.isAlive && !localPlayer.inVent) {
-            for (const b of deadBodies) {
+          if (localP.isAlive && !localP.inVent) {
+            for (const b of curDeadBodies) {
               if (b.reported) continue;
               const d = Math.hypot(currentX - b.x, currentY - b.y);
-              if (d < 120 && hasLineOfSight(currentX, currentY, b.x, b.y, lockedDoors)) {
+              if (d < 120 && hasLineOfSight(currentX, currentY, b.x, b.y, curLockedDoors)) {
                 foundBody = b;
                 break;
               }
@@ -529,11 +579,12 @@ export function GameCanvas({
 
           // Kill Target Proximity (Requires Impostor + Living Victim + Line of Sight through walls & locked doors)
           let foundKillTarget: Player | null = null;
-          if (localPlayer.role === 'impostor' && localPlayer.isAlive && !localPlayer.inVent) {
-            for (const p of Object.values(players)) {
+          const curAllPlayers = playersRef.current;
+          if (localP.role === 'impostor' && localP.isAlive && !localP.inVent) {
+            for (const p of Object.values(curAllPlayers)) {
               if (p.id !== localPlayerId && p.isAlive && p.role !== 'impostor' && !p.inVent) {
                 const d = Math.hypot(currentX - p.x, currentY - p.y);
-                if (d < 110 && hasLineOfSight(currentX, currentY, p.x, p.y, lockedDoors)) {
+                if (d < 110 && hasLineOfSight(currentX, currentY, p.x, p.y, curLockedDoors)) {
                   foundKillTarget = p;
                   break;
                 }
@@ -544,9 +595,9 @@ export function GameCanvas({
 
           // Vent Proximity
           let foundVent: VentDefinition | null = null;
-          if (localPlayer.role === 'impostor' && localPlayer.isAlive) {
-            if (localPlayer.inVent && localPlayer.ventId) {
-              foundVent = VENTS.find((v) => v.id === localPlayer.ventId) || null;
+          if (localP.role === 'impostor' && localP.isAlive) {
+            if (localP.inVent && localP.ventId) {
+              foundVent = VENTS.find((v) => v.id === localP.ventId) || null;
             } else {
               for (const v of VENTS) {
                 const d = Math.hypot(currentX - v.x, currentY - v.y);
@@ -559,33 +610,51 @@ export function GameCanvas({
           }
           setNearbyVent(foundVent);
 
+          // 3. Smooth Interpolation (Lerp) for Remote Players
+          const renderedPlayers: Record<string, Player> = {};
+          for (const p of Object.values(curAllPlayers)) {
+            if (p.id === localPlayerId) {
+              renderedPlayers[p.id] = {
+                ...localP,
+                x: currentX,
+                y: currentY,
+                facing: facingRef.current,
+              };
+            } else {
+              if (!lerpedPositions.current[p.id]) {
+                lerpedPositions.current[p.id] = { x: p.x, y: p.y };
+              }
+              const lp = lerpedPositions.current[p.id];
+              // Smooth lerp towards target coordinates
+              lp.x += (p.x - lp.x) * Math.min(1, delta * 20);
+              lp.y += (p.y - lp.y) * Math.min(1, delta * 20);
 
-          // 3. Camera Offset (Centered on Local Player)
+              renderedPlayers[p.id] = {
+                ...p,
+                x: lp.x,
+                y: lp.y,
+              };
+            }
+          }
+
+          // 4. Camera Offset (Centered on Local Player)
           const viewX = currentX - canvas.width / 2;
           const viewY = currentY - canvas.height / 2;
 
-          // 4. Render The Skeld Game World
+          // 5. Render The Skeld Game World
           drawTheSkeld(
             ctx,
             viewX,
             viewY,
             canvas.width,
             canvas.height,
-            { ...localPlayer, x: currentX, y: currentY, facing: facingRef.current },
-            {
-              ...players,
-              [localPlayerId]: {
-                ...localPlayer,
-                x: currentX,
-                y: currentY,
-                facing: facingRef.current,
-              },
-            },
-            deadBodies,
-            activeTask ? activeTask.id : null,
-            activeSabotage,
-            isSecurityCamActive,
-            lockedDoors
+            { ...localP, x: currentX, y: currentY, facing: facingRef.current },
+            renderedPlayers,
+            curDeadBodies,
+            activeTaskRef.current ? activeTaskRef.current.id : null,
+            curActiveSab,
+            isSecurityCamActiveRef.current,
+            curLockedDoors
           );
         }
       }
@@ -595,21 +664,7 @@ export function GameCanvas({
 
     animationFrameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [
-    activeTask,
-    deadBodies,
-    localPlayer,
-    localPlayerId,
-    onPlayerMove,
-    players,
-    settings.playerSpeed,
-    showCCTV,
-    showAdminRadar,
-    showSabotageModal,
-    activeSabotage,
-    isSecurityCamActive,
-    lockedDoors,
-  ]);
+  }, [localPlayerId, emergencyCooldown]);
 
   // Handle Resize
   useEffect(() => {
