@@ -107,7 +107,8 @@ export function drawTheSkeld(
   activeTaskId: string | null,
   activeSabotage?: ActiveSabotage | null,
   isSecurityCamActive?: boolean,
-  lockedDoors?: Record<string, number>
+  lockedDoors?: Record<string, number>,
+  zoom: number = 1.35
 ) {
   ctx.save();
 
@@ -119,11 +120,13 @@ export function drawTheSkeld(
 
   // 2. Parallax Space Environment
   ctx.save();
+  ctx.scale(zoom, zoom);
   ctx.translate(-viewX * 0.15, -viewY * 0.15);
   drawDeepSpace(ctx, time);
   ctx.restore();
 
-  // Camera translation for The Skeld interior
+  // Camera translation & Zoom for The Skeld interior
+  ctx.scale(zoom, zoom);
   ctx.translate(-viewX, -viewY);
 
   // 3. Outer Spaceship Hull Blueprint Silhouette

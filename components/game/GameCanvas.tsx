@@ -745,9 +745,10 @@ export function GameCanvas({
             }
           }
 
-          // 4. Camera Offset (Centered on Local Player)
-          const viewX = currentX - canvas.width / 2;
-          const viewY = currentY - canvas.height / 2;
+          // 4. Camera Offset (Centered on Local Player with close-up POV Zoom)
+          const ZOOM = 1.35;
+          const viewX = currentX - (canvas.width / 2) / ZOOM;
+          const viewY = currentY - (canvas.height / 2) / ZOOM;
 
           // 5. Render The Skeld Game World
           drawTheSkeld(
@@ -762,7 +763,8 @@ export function GameCanvas({
             activeTaskRef.current ? activeTaskRef.current.id : null,
             curActiveSab,
             isSecurityCamActiveRef.current,
-            curLockedDoors
+            curLockedDoors,
+            ZOOM
           );
         }
       }
