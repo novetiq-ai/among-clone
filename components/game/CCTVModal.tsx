@@ -28,25 +28,25 @@ export function CCTVModal({ players, deadBodies, localPlayer, onClose }: CCTVMod
     {
       id: 'cam-medbay',
       name: 'KAMERA 1: MEDBAY FLUR',
-      bounds: { x: 740, y: 380, w: 280, h: 220 },
+      bounds: { x: 740, y: 380, w: 280, h: 140 },
       camPos: SECURITY_CAMERAS[0],
     },
     {
       id: 'cam-admin',
       name: 'KAMERA 2: ADMIN FLUR',
-      bounds: { x: 1300, y: 920, w: 280, h: 220 },
+      bounds: { x: 1100, y: 740, w: 200, h: 220 },
       camPos: SECURITY_CAMERAS[1],
     },
     {
       id: 'cam-nav',
       name: 'KAMERA 3: NAVIGATION FLUR',
-      bounds: { x: 1800, y: 680, w: 280, h: 220 },
+      bounds: { x: 1640, y: 640, w: 240, h: 200 },
       camPos: SECURITY_CAMERAS[2],
     },
     {
       id: 'cam-reactor',
       name: 'KAMERA 4: REAKTOR FLUR',
-      bounds: { x: 300, y: 700, w: 280, h: 220 },
+      bounds: { x: 320, y: 680, w: 240, h: 240 },
       camPos: SECURITY_CAMERAS[3],
     },
   ];

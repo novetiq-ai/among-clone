@@ -98,22 +98,24 @@ export function SkeldMinimapModal({ localPlayer, activeSabotage, onClose }: Skel
             {/* 1. Outer Ship Hull Blueprint Outline */}
             <path
               d="
-                M 60 580
-                L 240 320
-                L 600 320
-                L 920 380
-                L 1480 380
-                L 1600 300
-                L 1980 300
-                L 2380 620
-                L 2380 1060
-                L 1980 1480
-                L 1600 1480
-                L 1260 1480
-                L 900 1480
-                L 600 1440
-                L 240 1440
-                L 60 1100
+                M 40 600
+                L 240 260
+                L 600 260
+                L 960 250
+                L 1440 250
+                L 1560 250
+                L 1860 250
+                L 1960 590
+                L 2320 620
+                L 2320 950
+                L 1960 970
+                L 1930 1330
+                L 1540 1450
+                L 1250 1450
+                L 920 1370
+                L 570 1350
+                L 220 1350
+                L 40 1030
                 Z
               "
               fill="#060c18"

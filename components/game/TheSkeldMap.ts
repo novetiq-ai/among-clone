@@ -1,7 +1,6 @@
 import { ROOMS, CORRIDORS, WALLS, ALL_TASKS, VENTS, EMERGENCY_BUTTON_POS, SECURITY_CAMERAS, LOCKED_DOOR_WALLS } from '@/lib/map-data';
-import { Player, DeadBody, PLAYER_COLORS, ActiveSabotage, HatType } from '@/types/game';
+import { Player, DeadBody, ActiveSabotage, HatType, PLAYER_COLORS } from '@/types/game';
 
-// Helper for rendering glowing circular items
 function drawGlowCircle(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -20,69 +19,62 @@ function drawGlowCircle(
   ctx.restore();
 }
 
-/**
- * 2D Raycast Line-Of-Sight Helper:
- * Tests if the straight line between (x1, y1) and (x2, y2) intersects any solid structural wall.
- */
 function lineIntersectsBox(
   x1: number,
   y1: number,
   x2: number,
   y2: number,
-  bx: number,
-  by: number,
-  bw: number,
-  bh: number
+  boxX: number,
+  boxY: number,
+  boxW: number,
+  boxH: number
 ): boolean {
-  const minX = Math.min(x1, x2);
-  const maxX = Math.max(x1, x2);
-  const minY = Math.min(y1, y2);
-  const maxY = Math.max(y1, y2);
+  let tmin = 0;
+  let tmax = 1;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
 
-  // Fast AABB bounding check
-  if (maxX < bx || minX > bx + bw || maxY < by || minY > by + bh) {
-    return false;
+  // X slab
+  if (Math.abs(dx) < 1e-8) {
+    if (x1 < boxX || x1 > boxX + boxW) return false;
+  } else {
+    let t1 = (boxX - x1) / dx;
+    let t2 = (boxX + boxW - x1) / dx;
+    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return false;
   }
 
-  const ccw = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
-    (cy - ay) * (bx - ax) > (by - ay) * (cx - ax);
+  // Y slab
+  if (Math.abs(dy) < 1e-8) {
+    if (y1 < boxY || y1 > boxY + boxH) return false;
+  } else {
+    let t1 = (boxY - y1) / dy;
+    let t2 = (boxY + boxH - y1) / dy;
+    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return false;
+  }
 
-  const intersect = (
-    ax: number,
-    ay: number,
-    bx: number,
-    by: number,
-    cx: number,
-    cy: number,
-    dx: number,
-    dy: number
-  ) =>
-    ccw(ax, ay, cx, cy, dx, dy) !== ccw(bx, by, cx, cy, dx, dy) &&
-    ccw(ax, ay, bx, by, cx, cy) !== ccw(ax, ay, bx, by, dx, dy);
-
-  return (
-    intersect(x1, y1, x2, y2, bx, by, bx + bw, by) ||
-    intersect(x1, y1, x2, y2, bx + bw, by, bx + bw, by + bh) ||
-    intersect(x1, y1, x2, y2, bx + bw, by + bh, bx, by + bh) ||
-    intersect(x1, y1, x2, y2, bx, by + bh, bx, by)
-  );
+  return true;
 }
 
 export function hasLineOfSight(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
   lockedDoors?: Record<string, number>
 ): boolean {
   for (const wall of WALLS) {
-    if (wall.isObstacle) continue; // Furniture doesn't block LOS
-    if (lineIntersectsBox(x1, y1, x2, y2, wall.x, wall.y, wall.width, wall.height)) {
+    if (wall.isObstacle) continue;
+    if (lineIntersectsBox(fromX, fromY, toX, toY, wall.x, wall.y, wall.width, wall.height)) {
       return false;
     }
   }
 
-  // Active locked doors also block line of sight
   if (lockedDoors) {
     const now = Date.now();
     for (const [roomKey, expiry] of Object.entries(lockedDoors)) {
@@ -91,7 +83,7 @@ export function hasLineOfSight(
         const doorList = LOCKED_DOOR_WALLS[normalizedKey] || LOCKED_DOOR_WALLS[roomKey.toLowerCase()];
         if (doorList) {
           for (const doorWall of doorList) {
-            if (lineIntersectsBox(x1, y1, x2, y2, doorWall.x, doorWall.y, doorWall.width, doorWall.height)) {
+            if (lineIntersectsBox(fromX, fromY, toX, toY, doorWall.x, doorWall.y, doorWall.width, doorWall.height)) {
               return false;
             }
           }
@@ -102,7 +94,6 @@ export function hasLineOfSight(
 
   return true;
 }
-
 
 export function drawTheSkeld(
   ctx: CanvasRenderingContext2D,
@@ -121,276 +112,187 @@ export function drawTheSkeld(
   ctx.save();
 
   // 1. Clear space background
-  ctx.fillStyle = '#030712';
+  ctx.fillStyle = '#020617';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
   const time = typeof performance !== 'undefined' ? performance.now() : 0;
 
-  // 2. Draw Space Environment with Parallax (0.2x translation for deep cosmic depth)
+  // 2. Parallax Space Environment
   ctx.save();
-  ctx.translate(-viewX * 0.2, -viewY * 0.2);
+  ctx.translate(-viewX * 0.15, -viewY * 0.15);
   drawDeepSpace(ctx, time);
   ctx.restore();
 
-  // Apply Camera translation for The Skeld ship interior
+  // Camera translation for The Skeld interior
   ctx.translate(-viewX, -viewY);
 
-  // 3. Draw Outer Spaceship Hull & Silhouette
+  // 3. Outer Spaceship Hull Blueprint Silhouette
   drawShipHull(ctx, time);
 
-  // 4. Draw Room Floors & Hallways with authentic Skeld panels
+  // 4. Room Floors & Hallways
   drawShipFloors(ctx, time, activeSabotage);
 
-  // 5. Draw Hazard Stripes & Room Decals
+  // 5. Hazard Stripes & Corridor Details
   drawRoomDecals(ctx, time);
-
-  // NEW: Draw corridor details
   drawCorridorDetails(ctx, time);
 
-  // 6. Draw Detailed Room Furniture & Machines (Cafeteria, Reactor, Engines, Admin, Medbay, Shields, etc.)
+  // 6. Detailed Room Furniture & Machines
   drawDetailedRoomObjects(ctx, time, localPlayer);
 
-  // 7. Draw Vents
+  // 7. Vents
   drawVents(ctx, localPlayer, time);
 
-  // 8. Draw Security Cameras on Hallway Walls
+  // 8. Security Cameras
   drawSecurityCameras(ctx, isSecurityCamActive || false, time);
 
-  // 9. Draw Locked Doors (if door sabotage active)
+  // 9. Locked Doors
   if (lockedDoors) {
     drawLockedDoors(ctx, lockedDoors, time);
   }
 
-  // 10. Draw Task Stations with Glowing Interactive Prompts
+  // 10. Task Stations
   drawTaskStations(ctx, localPlayer, activeTaskId, time);
 
-  // 11. Draw Emergency Button in Cafeteria
+  // 11. Cafeteria Emergency Button
   drawEmergencyButton(ctx, localPlayer, time);
 
-  // 12. Draw Dead Bodies on the floor (filtered by Line of Sight)
+  // 12. Dead Bodies
   drawDeadBodies(ctx, deadBodies, localPlayer, time, activeSabotage, lockedDoors);
 
-  // 13. Draw Players (Living & Ghost Crewmates, filtered by Line of Sight)
+  // 13. Players
   drawPlayers(ctx, players, localPlayer, time, activeSabotage, lockedDoors);
 
-
-  // 14. Draw Solid Ship Walls & Structural Bulkheads (drawn over players for realistic 2.5D occlusion)
+  // 14. Solid Walls & Bulkheads (2.5D Occlusion)
   drawWallsAndBulkheads(ctx, time);
 
-  // 15. Draw Glowing World-Space Sabotage Beacons (Sonar waves at terminals)
+  // 15. Sabotage Beacons
   drawSabotageBeacons(ctx, activeSabotage, time);
 
-  // 16. Dynamic Vision & Lighting (Fog of War / Flashlight Vignette / Alarm Strobes)
-  ctx.restore(); // Restore camera translation to screen space
+  // 16. Dynamic Lighting & Fog of War
+  ctx.restore();
   drawDynamicLighting(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
 
-  // 17. Screen-Space Directional Sabotage Navigation Arrows (Point towards O2, Reactor, Lights terminals)
+  // 17. Screen-Space Directional Sabotage Arrows
   drawSabotageDirectionalArrows(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
 }
 
-// Deep Space starfield with nebulae, floating asteroids & twinkling stars
 function drawDeepSpace(ctx: CanvasRenderingContext2D, time: number) {
-  // Nebula gas glows
-  const nebulae = [
-    { x: 350, y: 180, r: 350, col: 'rgba(56, 189, 248, 0.06)' },
-    { x: 2150, y: 250, r: 400, col: 'rgba(168, 85, 247, 0.07)' },
-    { x: 1200, y: 1550, r: 320, col: 'rgba(236, 72, 153, 0.05)' },
-    { x: 120, y: 1150, r: 300, col: 'rgba(59, 130, 246, 0.06)' },
-    { x: 1800, y: 1450, r: 350, col: 'rgba(20, 184, 166, 0.05)' },
-  ];
+  // Distant Nebula Clouds
+  const grad1 = ctx.createRadialGradient(800, 600, 100, 800, 600, 900);
+  grad1.addColorStop(0, 'rgba(56, 189, 248, 0.06)');
+  grad1.addColorStop(0.5, 'rgba(99, 102, 241, 0.03)');
+  grad1.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad1;
+  ctx.fillRect(0, 0, 3200, 2200);
 
-  for (const n of nebulae) {
-    const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-    grad.addColorStop(0, n.col);
-    grad.addColorStop(1, 'transparent');
-    ctx.fillStyle = grad;
-    ctx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2);
-  }
+  const grad2 = ctx.createRadialGradient(2000, 1100, 150, 2000, 1100, 800);
+  grad2.addColorStop(0, 'rgba(236, 72, 153, 0.05)');
+  grad2.addColorStop(0.6, 'rgba(168, 85, 247, 0.02)');
+  grad2.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad2;
+  ctx.fillRect(0, 0, 3200, 2200);
 
-  // Multi-layered Stars
-  const stars = [
-    [80, 120, 1.5, 0.6], [320, 70, 2, 0.8], [720, 160, 1, 0.5], [1120, 80, 2.5, 0.9],
-    [1620, 200, 1.5, 0.7], [2020, 110, 2, 0.6], [2280, 230, 1, 0.4], [40, 420, 2, 0.7],
-    [2360, 460, 1.5, 0.8], [50, 1120, 1.5, 0.5], [2330, 1160, 2, 0.7], [320, 1530, 1, 0.4],
-    [720, 1490, 2.5, 0.9], [1320, 1550, 1.5, 0.6], [1820, 1510, 2, 0.7], [2260, 1430, 1.5, 0.5],
-    [480, 40, 1, 0.5], [1420, 50, 2, 0.8], [1920, 70, 1, 0.4], [90, 780, 2.5, 0.9],
-    [2390, 830, 1.5, 0.7], [980, 1570, 1, 0.6], [1580, 1580, 2, 0.8], [1250, 220, 1.5, 0.5],
-    [1750, 120, 1, 0.6], [2100, 540, 2, 0.8], [2300, 950, 1.5, 0.6]
-  ];
+  // Twinkling Starfield
+  for (let i = 0; i < 180; i++) {
+    const starX = (i * 137.5) % 2800;
+    const starY = (i * 269.3) % 2000;
+    const size = (i % 3 === 0) ? 2.5 : (i % 2 === 0) ? 1.5 : 1;
+    const alpha = 0.3 + 0.7 * Math.abs(Math.sin((time / 1500) + i));
 
-  for (let i = 0; i < stars.length; i++) {
-    const [sx, sy, size, baseAlpha] = stars[i];
-    const twinkle = Math.sin((time / 500) + i * 1.6) * 0.3 + 0.7;
-    ctx.fillStyle = `rgba(255, 255, 255, ${baseAlpha * twinkle})`;
-    ctx.beginPath();
-    ctx.arc(sx, sy, size, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Floating asteroids outside the ship
-  const asteroidTime = time * 0.015;
-  const asteroids = [
-    { baseX: 1800, baseY: 180, r: 24, speed: 0.8, rot: asteroidTime * 0.05 },
-    { baseX: 2200, baseY: 420, r: 16, speed: 1.2, rot: -asteroidTime * 0.08 },
-    { baseX: 200, baseY: 220, r: 28, speed: 0.6, rot: asteroidTime * 0.03 },
-    { baseX: 1600, baseY: 1520, r: 20, speed: 0.9, rot: -asteroidTime * 0.04 },
-  ];
-
-  for (const a of asteroids) {
-    const curX = ((a.baseX + asteroidTime * a.speed) % 2600) - 100;
-    const curY = a.baseY + Math.sin(asteroidTime * 0.05 + a.r) * 12;
-
-    ctx.save();
-    ctx.translate(curX, curY);
-    ctx.rotate(a.rot);
-
-    // Asteroid Body
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.moveTo(a.r, 0);
-    ctx.lineTo(a.r * 0.7, a.r * 0.8);
-    ctx.lineTo(-a.r * 0.4, a.r * 0.9);
-    ctx.lineTo(-a.r * 0.9, a.r * 0.3);
-    ctx.lineTo(-a.r * 0.8, -a.r * 0.7);
-    ctx.lineTo(a.r * 0.3, -a.r * 0.9);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    // Asteroid Craters
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.arc(a.r * 0.2, a.r * 0.2, a.r * 0.25, 0, Math.PI * 2);
-    ctx.arc(-a.r * 0.3, -a.r * 0.2, a.r * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
+    ctx.fillStyle = i % 5 === 0 ? `rgba(186, 230, 253, ${alpha})` : `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillRect(starX, starY, size, size);
   }
 }
-
-
-function drawCorridorDetails(ctx: CanvasRenderingContext2D, time: number) {
-  for (const corr of CORRIDORS) {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 4;
-    
-    if (corr.width > corr.height) { // horizontal
-      ctx.beginPath();
-      ctx.moveTo(corr.x, corr.y + 10);
-      ctx.lineTo(corr.x + corr.width, corr.y + 10);
-      ctx.stroke();
-      
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.beginPath();
-      ctx.moveTo(corr.x + corr.width/2 - 10, corr.y + corr.height/2 - 10);
-      ctx.lineTo(corr.x + corr.width/2 + 10, corr.y + corr.height/2);
-      ctx.lineTo(corr.x + corr.width/2 - 10, corr.y + corr.height/2 + 10);
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(corr.x + 10, corr.y);
-      ctx.lineTo(corr.x + 10, corr.y + corr.height);
-      ctx.stroke();
-      
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.beginPath();
-      ctx.moveTo(corr.x + corr.width/2 - 10, corr.y + corr.height/2 - 10);
-      ctx.lineTo(corr.x + corr.width/2 + 10, corr.y + corr.height/2 - 10);
-      ctx.lineTo(corr.x + corr.width/2, corr.y + corr.height/2 + 10);
-      ctx.fill();
-    }
-    
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.fillRect(corr.x + corr.width/2 - 15, corr.y + corr.height/2 - 15, 30, 30);
-  }
-}
-
-// Outer Ship Hull Silhouette & Realistic Spaceship Outlines
 
 function drawShipHull(ctx: CanvasRenderingContext2D, time: number) {
-  ctx.fillStyle = '#0b1120';
+  // Outer Spaceship Hull silhouette
+  ctx.save();
+  ctx.fillStyle = '#060c18';
   ctx.beginPath();
-  ctx.moveTo(300, 800);
-  ctx.lineTo(200, 320);
-  ctx.lineTo(800, 300);
-  ctx.lineTo(1600, 300);
-  ctx.quadraticCurveTo(2400, 300, 2400, 800);
-  ctx.quadraticCurveTo(2400, 1300, 1600, 1300);
-  ctx.lineTo(800, 1300);
-  ctx.lineTo(200, 1280);
+  ctx.moveTo(60, 580);
+  ctx.lineTo(240, 260);
+  ctx.lineTo(600, 260);
+  ctx.lineTo(960, 250);
+  ctx.lineTo(1440, 250);
+  ctx.lineTo(1560, 250);
+  ctx.lineTo(1860, 250);
+  ctx.lineTo(1960, 590);
+  ctx.lineTo(2320, 620);
+  ctx.lineTo(2320, 950);
+  ctx.lineTo(1960, 970);
+  ctx.lineTo(1930, 1330);
+  ctx.lineTo(1540, 1450);
+  ctx.lineTo(1250, 1450);
+  ctx.lineTo(920, 1370);
+  ctx.lineTo(570, 1350);
+  ctx.lineTo(220, 1350);
+  ctx.lineTo(40, 1030);
   ctx.closePath();
   ctx.fill();
-  
+
   ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 12;
+  ctx.lineWidth = 14;
   ctx.stroke();
 
-  ctx.fillStyle = '#1e293b';
-  ctx.beginPath();
-  ctx.roundRect(10, 420, 190, 160, [16, 0, 0, 16]);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 4;
-  ctx.stroke();
+  // Engine Pod Nozzles (Far Left)
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(10, 360, 210, 140);
+  ctx.strokeRect(10, 360, 210, 140);
+  ctx.fillRect(10, 1080, 210, 140);
+  ctx.strokeRect(10, 1080, 210, 140);
 
-  ctx.beginPath();
-  ctx.roundRect(10, 1020, 190, 160, [16, 0, 0, 16]);
-  ctx.fill();
-  ctx.stroke();
-
-  const flamePulse = Math.sin(time / 100) * 8;
-  const flameGradTop = ctx.createLinearGradient(10, 500, -50 - flamePulse, 500);
-  flameGradTop.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
-  flameGradTop.addColorStop(0.5, 'rgba(2, 132, 199, 0.4)');
+  // Engine Plasma Flames
+  const flamePulse = Math.sin(time / 80) * 12;
+  const flameGradTop = ctx.createLinearGradient(10, 430, -70 - flamePulse, 430);
+  flameGradTop.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+  flameGradTop.addColorStop(0.5, 'rgba(2, 132, 199, 0.5)');
   flameGradTop.addColorStop(1, 'transparent');
   ctx.fillStyle = flameGradTop;
   ctx.beginPath();
-  ctx.moveTo(10, 440);
-  ctx.lineTo(-40 - flamePulse, 500);
-  ctx.lineTo(10, 560);
+  ctx.moveTo(10, 380);
+  ctx.lineTo(-60 - flamePulse, 430);
+  ctx.lineTo(10, 480);
   ctx.closePath();
   ctx.fill();
 
-  const flameGradBottom = ctx.createLinearGradient(10, 1100, -50 - flamePulse, 1100);
-  flameGradBottom.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
-  flameGradBottom.addColorStop(0.5, 'rgba(2, 132, 199, 0.4)');
-  flameGradBottom.addColorStop(1, 'transparent');
-  ctx.fillStyle = flameGradBottom;
+  const flameGradBot = ctx.createLinearGradient(10, 1150, -70 - flamePulse, 1150);
+  flameGradBot.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+  flameGradBot.addColorStop(0.5, 'rgba(2, 132, 199, 0.5)');
+  flameGradBot.addColorStop(1, 'transparent');
+  ctx.fillStyle = flameGradBot;
   ctx.beginPath();
-  ctx.moveTo(10, 1040);
-  ctx.lineTo(-40 - flamePulse, 1100);
-  ctx.lineTo(10, 1160);
+  ctx.moveTo(10, 1100);
+  ctx.lineTo(-60 - flamePulse, 1150);
+  ctx.lineTo(10, 1200);
   ctx.closePath();
   ctx.fill();
 
+  // Weapons Cannon Barrels (Top-Right)
   ctx.fillStyle = '#334155';
-  ctx.fillRect(1980, 280, 70, 14);
-  ctx.fillRect(1980, 350, 70, 14);
+  ctx.fillRect(1840, 290, 70, 16);
+  ctx.fillRect(1840, 360, 70, 16);
   ctx.strokeStyle = '#0f172a';
   ctx.lineWidth = 3;
-  ctx.strokeRect(1980, 280, 70, 14);
-  ctx.strokeRect(1980, 350, 70, 14);
+  ctx.strokeRect(1840, 290, 70, 16);
+  ctx.strokeRect(1840, 360, 70, 16);
 
-  const laserCycle = Math.floor(time / 2000) % 2 === 0;
-  if (laserCycle && (time % 2000) < 300) {
+  // Periodic Laser Blasts from Weapons
+  const laserCycle = Math.floor(time / 2200) % 2 === 0;
+  if (laserCycle && (time % 2200) < 320) {
     ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(2050, 287);
-    ctx.lineTo(2350, 287);
-    ctx.moveTo(2050, 357);
-    ctx.lineTo(2350, 357);
+    ctx.moveTo(1910, 298); ctx.lineTo(2300, 298);
+    ctx.moveTo(1910, 368); ctx.lineTo(2300, 368);
     ctx.stroke();
-    drawGlowCircle(ctx, 2050, 287, 10, 'rgba(239, 68, 68, 0.8)', 15);
-    drawGlowCircle(ctx, 2050, 357, 10, 'rgba(239, 68, 68, 0.8)', 15);
+    drawGlowCircle(ctx, 1910, 298, 12, 'rgba(239, 68, 68, 0.85)', 18);
+    drawGlowCircle(ctx, 1910, 368, 12, 'rgba(239, 68, 68, 0.85)', 18);
   }
+  ctx.restore();
 }
 
-// Floors & Room Panels
-
 function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabotage?: ActiveSabotage | null) {
+  // 1. Draw Corridors
   for (const corr of CORRIDORS) {
     ctx.fillStyle = '#1c2638';
     ctx.fillRect(corr.x, corr.y, corr.width, corr.height);
@@ -405,6 +307,8 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
     for (let y = corr.y; y < corr.y + corr.height; y += tileSize) {
       ctx.beginPath(); ctx.moveTo(corr.x, y); ctx.lineTo(corr.x + corr.width, y); ctx.stroke();
     }
+
+    // Floor Center Guide Line
     ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
     if (corr.width >= corr.height) {
       ctx.fillRect(corr.x + 10, corr.y + corr.height / 2 - 2, corr.width - 20, 4);
@@ -413,42 +317,27 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
     }
   }
 
-  const roomColors: Record<string, string> = {
-    cafeteria: '#263040',
-    weapons: '#2a3545',
-    o2: '#1e3328',
-    navigation: '#1a2842',
-    shields: '#1e2d3d',
-    communications: '#252d38',
-    storage: '#2a3040',
-    admin: '#242c38',
-    electrical: '#181c24',
-    lower_engine: '#222c3a',
-    upper_engine: '#222c3a',
-    security: '#1c2630',
-    reactor: '#281a1e',
-    medbay: '#1a2a26',
-  };
-
+  // 2. Draw Rooms with authentic Skeld colors
   for (const room of ROOMS) {
-    const rName = room.name.toLowerCase().replace(/\s+/g, '_');
-    ctx.fillStyle = roomColors[rName] || '#212d40';
+    ctx.fillStyle = room.color || '#212d40';
     ctx.fillRect(room.x, room.y, room.width, room.height);
 
     ctx.strokeStyle = '#172233';
     ctx.lineWidth = 2;
     const tileSize = 60;
-    
-    if (rName === 'admin') {
+
+    if (room.id === 'admin') {
+      // Diamond tiling
       for (let x = room.x; x < room.x + room.width; x += 40) {
-        ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x+40, room.y+40); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x+40, room.y); ctx.lineTo(x, room.y+40); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x + 40, room.y + 40); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + 40, room.y); ctx.lineTo(x, room.y + 40); ctx.stroke();
       }
-    } else if (rName.includes('engine')) {
-       ctx.strokeStyle = '#111';
-       for (let x = room.x; x < room.x + room.width; x += 20) {
-          ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x, room.y+room.height); ctx.stroke();
-       }
+    } else if (room.id.includes('engine')) {
+      // Grating lines
+      ctx.strokeStyle = '#111827';
+      for (let x = room.x; x < room.x + room.width; x += 20) {
+        ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x, room.y + room.height); ctx.stroke();
+      }
     } else {
       for (let x = room.x; x < room.x + room.width; x += tileSize) {
         ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x, room.y + room.height); ctx.stroke();
@@ -458,15 +347,17 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
       }
     }
 
-    ctx.fillStyle = '#111927';
+    // Room Rivets
+    ctx.fillStyle = '#0f172a';
     for (let x = room.x + 8; x < room.x + room.width; x += tileSize) {
       for (let y = room.y + 8; y < room.y + room.height; y += tileSize) {
         ctx.fillRect(x, y, 3, 3);
       }
     }
 
+    // Big Stencil Room Name on floor
     ctx.save();
-    ctx.font = '900 24px ui-monospace, SFMono-Regular, "Courier New", monospace';
+    ctx.font = '900 24px monospace';
     ctx.fillStyle = 'rgba(148, 163, 184, 0.22)';
     ctx.textAlign = 'center';
     ctx.letterSpacing = '4px';
@@ -474,8 +365,6 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
     ctx.restore();
   }
 }
-
-// Hazard stripes & room decals
 
 function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
   const drawHazardTape = (x: number, y: number, w: number, h: number) => {
@@ -497,547 +386,368 @@ function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
     ctx.restore();
   };
 
-  drawHazardTape(200, 580, 140, 14); // Reactor Top ➔ Upper Engine
-  drawHazardTape(200, 1060, 140, 14); // Reactor Bottom ➔ Lower Engine
-  drawHazardTape(640, 940, 90, 14);
-  drawHazardTape(920, 1040, 100, 14);
-  drawHazardTape(1300, 1040, 100, 14);
-  drawHazardTape(1600, 1080, 90, 14);
-  drawHazardTape(1960, 680, 80, 14);
-  drawHazardTape(620, 640, 90, 14);
-  drawHazardTape(620, 360, 90, 14);
-  
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
-  ctx.font = '24px sans-serif';
-  ctx.fillText('EXIT ->', 1400, 1000);
-  ctx.fillText('<- REACTOR', 500, 950);
-  
-  ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(150, 650, 40, 40);
-  ctx.fillStyle = '#000';
-  ctx.fillText('!', 165, 675);
+  // Doorway Hazard Stripes matching all 1:1 room openings
+  drawHazardTape(930, 410, 40, 14); // Cafeteria West
+  drawHazardTape(1430, 380, 40, 14); // Cafeteria East
+  drawHazardTape(1160, 710, 80, 14); // Cafeteria South
+  drawHazardTape(750, 490, 80, 14); // MedBay North
+  drawHazardTape(360, 590, 80, 14); // Upper Engine South
+  drawHazardTape(270, 770, 40, 14); // Reactor East
+  drawHazardTape(560, 780, 40, 14); // Security West
+  drawHazardTape(360, 1010, 80, 14); // Lower Engine North
+  drawHazardTape(720, 1130, 80, 14); // Electrical South
+  drawHazardTape(890, 1210, 40, 14); // Storage West
+  drawHazardTape(1160, 930, 80, 14); // Storage North
+  drawHazardTape(1290, 1110, 40, 14); // Storage East
+  drawHazardTape(1320, 840, 40, 14); // Admin West
 }
 
-// Detailed Room Objects (Cafeteria, Reactor, Engines, Admin, Medbay, Shields, etc.)
+function drawCorridorDetails(ctx: CanvasRenderingContext2D, time: number) {
+  for (const corr of CORRIDORS) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 3;
+
+    if (corr.width > corr.height) {
+      ctx.beginPath();
+      ctx.moveTo(corr.x, corr.y + 8);
+      ctx.lineTo(corr.x + corr.width, corr.y + 8);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(corr.x + 8, corr.y);
+      ctx.lineTo(corr.x + 8, corr.y + corr.height);
+      ctx.stroke();
+    }
+  }
+}
 
 function drawDetailedRoomObjects(ctx: CanvasRenderingContext2D, time: number, localPlayer: Player) {
-  // CAFETERIA
-  ctx.fillStyle = '#040714'; ctx.fillRect(1080, 430, 240, 20); ctx.strokeStyle = '#38bdf8'; ctx.strokeRect(1080, 430, 240, 20);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.beginPath(); ctx.ellipse(1200, 648, 98, 56, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(1200, 640, 95, 52, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#0f172a'; ctx.stroke();
-  ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.ellipse(1200, 640, 75, 38, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#475569'; ctx.stroke();
-  for (let i = 0; i < 10; i++) {
-    const angle = (i / 10) * Math.PI * 2;
-    const cx = 1200 + Math.cos(angle) * 122; const cy = 640 + Math.sin(angle) * 68;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.beginPath(); ctx.ellipse(cx, cy + 4, 13, 11, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#0f172a'; ctx.stroke();
-  }
-  const drawSideTable = (tx: number, ty: number) => {
-    ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.roundRect(tx - 30, ty - 18, 60, 36, 10); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(tx - 12, ty - 4, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(tx + 10, ty + 2, 6, 0, Math.PI * 2); ctx.fill();
+  // 1. CAFETERIA (Center: 1200, 500)
+  // Large Central Meeting Table
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.beginPath(); ctx.ellipse(1200, 506, 95, 52, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#334155';
+  ctx.beginPath(); ctx.ellipse(1200, 500, 90, 48, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath(); ctx.ellipse(1200, 500, 70, 36, 0, 0, Math.PI * 2); ctx.fill();
+
+  // 4 Dining Tables with chairs
+  const drawDiningTable = (tx: number, ty: number) => {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath(); ctx.ellipse(tx, ty + 4, 38, 22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.ellipse(tx, ty, 35, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0284c7'; ctx.lineWidth = 2; ctx.stroke();
+
+    // Chairs around dining table
+    for (let a = 0; a < 4; a++) {
+      const angle = (a / 4) * Math.PI * 2;
+      const cx = tx + Math.cos(angle) * 44;
+      const cy = ty + Math.sin(angle) * 26;
+      ctx.fillStyle = '#475569';
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+    }
   };
-  drawSideTable(980, 560); drawSideTable(1360, 560);
-  ctx.fillStyle = '#991b1b'; ctx.fillRect(1000, 420, 30, 40); ctx.fillStyle = '#064e3b'; ctx.fillRect(1040, 420, 30, 40);
-  ctx.fillStyle = '#fff'; ctx.fillRect(1005, 425, 20, 15); ctx.fillRect(1045, 425, 20, 15);
-  ctx.fillStyle = '#475569'; ctx.fillRect(920, 600, 30, 100);
-  ctx.fillStyle = '#64748b'; ctx.fillRect(1450, 700, 20, 40);
+  drawDiningTable(1070, 380);
+  drawDiningTable(1330, 380);
+  drawDiningTable(1070, 610);
+  drawDiningTable(1330, 610);
 
-  // WEAPONS
-  ctx.fillStyle = '#040714'; ctx.fillRect(1800, 340, 160, 20);
-  for(let i=0; i<30; i++) {
-     ctx.fillStyle = '#fff'; ctx.fillRect(1800+Math.random()*160, 340+Math.random()*20, 2, 2);
-  }
-  ctx.fillStyle = '#475569'; ctx.fillRect(1600, 400, 20, 60);
-  ctx.fillStyle = '#000'; ctx.fillRect(1605, 405, 10, 50);
-  
-  const wepX = 1780; const wepY = 480;
-  ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(wepX, wepY - 26, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.arc(wepX, wepY + 26, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)'; ctx.beginPath(); ctx.arc(wepX + 54, wepY, 24, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(wepX + 30, wepY); ctx.lineTo(wepX + 78, wepY); ctx.moveTo(wepX + 54, wepY - 24); ctx.lineTo(wepX + 54, wepY + 24); ctx.stroke();
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(1740, 450, 20, 60); ctx.fillStyle = '#10b981'; ctx.fillRect(1742, 460, 16, 16);
+  // Vending Machines on Cafeteria North Wall
+  ctx.fillStyle = '#dc2626'; ctx.fillRect(1120, 285, 36, 24); ctx.strokeRect(1120, 285, 36, 24);
+  ctx.fillStyle = '#16a34a'; ctx.fillRect(1240, 285, 36, 24); ctx.strokeRect(1240, 285, 36, 24);
 
-  // O2
-  const o2X = 1660; const o2Y = 780;
-  ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(o2X, o2Y + 10, 50, 30, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.25)'; ctx.beginPath(); ctx.arc(o2X, o2Y, 44, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(o2X - 10, o2Y + 5, 15, 0, Math.PI * 2); ctx.arc(o2X + 10, o2Y + 4, 18, 0, Math.PI * 2); ctx.arc(o2X, o2Y - 10, 16, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#451a03'; ctx.fillRect(1550, 700, 16, 16); ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(1558, 695, 8, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#451a03'; ctx.fillRect(1580, 700, 16, 16); ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(1588, 695, 8, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#64748b'; ctx.fillRect(1750, 680, 40, 20);
-  
-  // NAVIGATION
-  const navX = 2140; const navY = 840;
-  ctx.fillStyle = '#040714'; ctx.fillRect(2300, 700, 40, 200);
-  for(let i=0; i<30; i++) {
-     ctx.fillStyle = '#fff'; ctx.fillRect(2300+Math.random()*40, 700+Math.random()*200, 2, 2);
+  // 2. WEAPONS (1560, 280, 280, 280)
+  // Large Viewport Window into Space
+  ctx.fillStyle = '#020617'; ctx.fillRect(1660, 285, 140, 18);
+  for (let i = 0; i < 15; i++) {
+    ctx.fillStyle = '#fff'; ctx.fillRect(1665 + Math.sin(i * 99) * 60 + 60, 288 + (i % 12), 2, 2);
   }
-  ctx.fillStyle = '#334155'; ctx.fillRect(navX + 40, navY - 45, 26, 90); ctx.strokeRect(navX + 40, navY - 45, 26, 90);
-  ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.ellipse(2250, 750, 16, 24, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(2250, 950, 16, 24, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#475569'; ctx.fillRect(2200, 700, 30, 300);
+  // Dual Gunner Seats
+  ctx.fillStyle = '#475569';
+  ctx.beginPath(); ctx.arc(1740, 360, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(1740, 420, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Targeting Hologram Reticle
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(1800, 390, 26, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(1770, 390); ctx.lineTo(1830, 390); ctx.moveTo(1800, 360); ctx.lineTo(1800, 420); ctx.stroke();
+
+  // 3. O2 (1460, 580, 200, 180)
+  // Greenhouse Terrarium Dome
+  const o2X = 1560; const o2Y = 670;
+  ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(o2X, o2Y + 6, 46, 28, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.3)'; ctx.beginPath(); ctx.arc(o2X, o2Y, 40, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath(); ctx.arc(o2X - 10, o2Y + 4, 14, 0, Math.PI * 2); ctx.arc(o2X + 10, o2Y + 2, 16, 0, Math.PI * 2); ctx.arc(o2X, o2Y - 10, 15, 0, Math.PI * 2); ctx.fill();
+
+  // 4. NAVIGATION (1960, 620, 340, 320)
+  // Celestial Galaxy Hologram in Center
+  const navX = 2120; const navY = 780;
   const galaxyPulse = Math.sin(time / 300) * 0.2 + 0.8;
-  ctx.strokeStyle = `rgba(168, 85, 247, ${galaxyPulse})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(navX - 20, navY, 46, 0, Math.PI * 2); ctx.stroke();
-  ctx.save(); ctx.translate(navX - 20, navY); ctx.rotate(time / 800); ctx.beginPath(); ctx.ellipse(0, 0, 44, 18, 0, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#c084fc'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.strokeStyle = `rgba(168, 85, 247, ${galaxyPulse})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(navX, navY, 44, 0, Math.PI * 2); ctx.stroke();
+  ctx.save(); ctx.translate(navX, navY); ctx.rotate(time / 900);
+  ctx.beginPath(); ctx.ellipse(0, 0, 42, 16, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#c084fc'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 
-  // SHIELDS
-  const shieldsX = 1780; const shieldsY = 1305;
+  // Pilot Seats
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath(); ctx.ellipse(2240, 720, 16, 24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(2240, 840, 16, 24, 0, 0, Math.PI * 2); ctx.fill();
+
+  // 5. SHIELDS (1620, 1040, 300, 260)
+  // Hexagonal Energy Shield Core
+  const shX = 1770; const shY = 1170;
   ctx.fillStyle = '#0f172a'; ctx.beginPath();
   for (let a = 0; a < 6; a++) {
-    const angle = (a / 6) * Math.PI * 2; const hx = shieldsX + Math.cos(angle) * 44; const hy = shieldsY + Math.sin(angle) * 44;
+    const angle = (a / 6) * Math.PI * 2; const hx = shX + Math.cos(angle) * 44; const hy = shY + Math.sin(angle) * 44;
     if (a === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
   }
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  const shieldGlow = Math.sin(time / 350) * 0.2 + 0.8;
-  ctx.fillStyle = `rgba(56, 189, 248, ${0.45 * shieldGlow})`; ctx.beginPath();
+  const shieldGlow = Math.sin(time / 350) * 0.25 + 0.75;
+  ctx.fillStyle = `rgba(56, 189, 248, ${0.5 * shieldGlow})`;
+  ctx.beginPath();
   for (let a = 0; a < 6; a++) {
-    const angle = (a / 6) * Math.PI * 2; const hx = shieldsX + Math.cos(angle) * 32; const hy = shieldsY + Math.sin(angle) * 32;
+    const angle = (a / 6) * Math.PI * 2; const hx = shX + Math.cos(angle) * 32; const hy = shY + Math.sin(angle) * 32;
     if (a === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
   }
   ctx.closePath(); ctx.fill();
-  for(let i=0; i<3; i++) {
-    for(let j=0; j<3; j++) {
-       ctx.fillStyle = `rgba(56, 189, 248, ${0.45 * shieldGlow})`;
-       ctx.fillRect(1650 + i*20, 1200 + j*20, 15, 15);
-    }
-  }
 
-  // COMMUNICATIONS
-  const commsX = 1430; const commsY = 1350;
-  ctx.fillStyle = '#334155'; ctx.fillRect(commsX - 35, commsY - 25, 70, 50); ctx.strokeRect(commsX - 35, commsY - 25, 70, 50);
-  ctx.fillStyle = '#022c22'; ctx.fillRect(commsX - 28, commsY - 18, 56, 22); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2;
+  // 6. COMMUNICATIONS (1280, 1240, 240, 180)
+  // Radio Console & Audio Wave Display
+  ctx.fillStyle = '#334155'; ctx.fillRect(1380, 1310, 80, 50); ctx.strokeRect(1380, 1310, 80, 50);
+  ctx.fillStyle = '#022c22'; ctx.fillRect(1386, 1316, 68, 24); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2;
   ctx.beginPath();
-  for (let ox = 0; ox < 50; ox += 5) {
-    const waveY = commsY - 7 + Math.sin((time / 150) + ox * 0.3) * 6;
-    if (ox === 0) ctx.moveTo(commsX - 25 + ox, waveY); else ctx.lineTo(commsX - 25 + ox, waveY);
+  for (let ox = 0; ox < 60; ox += 5) {
+    const waveY = 1328 + Math.sin((time / 150) + ox * 0.3) * 6;
+    if (ox === 0) ctx.moveTo(1390 + ox, waveY); else ctx.lineTo(1390 + ox, waveY);
   }
   ctx.stroke();
-  ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.arc(1350, 1280, 20, 0, Math.PI); ctx.fill();
-  ctx.fillStyle = '#064e3b'; ctx.fillRect(commsX - 40, commsY - 60, 30, 20); ctx.fillRect(commsX, commsY - 60, 30, 20);
 
-  // STORAGE
+  // 7. STORAGE (920, 960, 380, 380)
+  // Pile of shipping crates in Center
   const crates = [
-    { x: 1000, y: 1100, w: 44, h: 44, col: '#78350f' }, { x: 1050, y: 1100, w: 40, h: 40, col: '#92400e' },
-    { x: 1020, y: 1148, w: 48, h: 44, col: '#78350f' }, { x: 1240, y: 1360, w: 42, h: 42, col: '#475569' },
-    { x: 1000, y: 1200, w: 40, h: 40, col: '#78350f' }, { x: 1050, y: 1200, w: 40, h: 40, col: '#92400e' },
-    { x: 1100, y: 1100, w: 44, h: 44, col: '#475569' }, { x: 1150, y: 1100, w: 44, h: 44, col: '#475569' },
+    { x: 1060, y: 1100, w: 44, h: 44, col: '#78350f' },
+    { x: 1110, y: 1100, w: 40, h: 40, col: '#92400e' },
+    { x: 1080, y: 1148, w: 48, h: 44, col: '#78350f' },
+    { x: 1040, y: 1190, w: 42, h: 42, col: '#475569' },
+    { x: 1090, y: 1190, w: 40, h: 40, col: '#0284c7' },
   ];
   for (const c of crates) {
     ctx.fillStyle = c.col; ctx.fillRect(c.x, c.y, c.w, c.h); ctx.strokeStyle = '#0f172a'; ctx.strokeRect(c.x, c.y, c.w, c.h);
     ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + c.w, c.y + c.h); ctx.moveTo(c.x + c.w, c.y); ctx.lineTo(c.x, c.y + c.h); ctx.stroke();
   }
-  ctx.fillStyle = '#eab308'; ctx.fillRect(1160, 1370, 22, 28); ctx.fillRect(1186, 1370, 22, 28); ctx.strokeRect(1160, 1370, 22, 28); ctx.strokeRect(1186, 1370, 22, 28);
-  ctx.fillStyle = '#f59e0b'; ctx.fillRect(1100, 1300, 60, 40); ctx.fillRect(1160, 1320, 20, 10);
-  ctx.fillStyle = '#334155'; ctx.fillRect(950, 1400, 60, 40);
+  // Fuel canisters
+  ctx.fillStyle = '#eab308'; ctx.fillRect(1220, 1240, 24, 30); ctx.fillRect(1250, 1240, 24, 30);
 
-  // ADMIN
-  const adminTableX = 1650; const adminTableY = 1020;
+  // 8. ADMIN (1340, 780, 300, 220)
+  // Hologram Map Conference Table
+  const adminTableX = 1490; const adminTableY = 890;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY + 6, 68, 36, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY, 65, 34, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#064e3b'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY, 48, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   const radarAngle = (time / 1000) % (Math.PI * 2);
   ctx.strokeStyle = '#34d399'; ctx.beginPath(); ctx.moveTo(adminTableX, adminTableY); ctx.lineTo(adminTableX + Math.cos(radarAngle) * 44, adminTableY + Math.sin(radarAngle) * 18); ctx.stroke();
-  ctx.strokeStyle = '#10b981'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY, 30, 10, 0, 0, Math.PI*2); ctx.stroke();
-  ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(1580, 1020, 10, 0, Math.PI*2); ctx.arc(1720, 1020, 10, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#1e293b'; ctx.fillRect(1780, 940, 20, 30);
 
-  // ELECTRICAL
-  const elecX = 730; const elecY = 1040;
-  ctx.fillStyle = '#334155'; ctx.fillRect(elecX, elecY, 65, 75); ctx.strokeRect(elecX, elecY, 65, 75);
-  ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.moveTo(elecX + 32, elecY + 12); ctx.lineTo(elecX + 52, elecY + 44); ctx.lineTo(elecX + 12, elecY + 44); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#000000'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡', elecX + 32, elecY + 38);
-  if (Math.sin(time / 80) > 0.6) {
-    ctx.strokeStyle = '#38bdf8'; ctx.beginPath(); ctx.moveTo(elecX + 32, elecY + 54); ctx.lineTo(elecX + 42, elecY + 60); ctx.lineTo(elecX + 28, elecY + 66); ctx.lineTo(elecX + 36, elecY + 70); ctx.stroke();
-    drawGlowCircle(ctx, elecX + 32, elecY + 62, 6, 'rgba(56, 189, 248, 0.8)', 12);
-  }
-  for(let i=0; i<5; i++) {
-      ctx.fillStyle = '#475569'; ctx.fillRect(630 + i*40, 940, 30, 40);
-  }
-  ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(630, 980); ctx.quadraticCurveTo(700, 1000, 750, 1040); ctx.stroke();
-  ctx.strokeStyle = '#3b82f6'; ctx.beginPath(); ctx.moveTo(650, 980); ctx.quadraticCurveTo(720, 1020, 770, 1040); ctx.stroke();
-  if(Math.random() > 0.8) {
-      ctx.fillStyle = 'rgba(255, 255, 100, 0.2)'; ctx.fillRect(620, 920, 300, 340);
+  // 9. ELECTRICAL (640, 920, 240, 220)
+  // Central Transformer
+  const elecX = 730; const elecY = 1000;
+  ctx.fillStyle = '#334155'; ctx.fillRect(elecX, elecY, 60, 60); ctx.strokeRect(elecX, elecY, 60, 60);
+  ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.moveTo(elecX + 30, elecY + 10); ctx.lineTo(elecX + 50, elecY + 40); ctx.lineTo(elecX + 10, elecY + 40); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#000'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡', elecX + 30, elecY + 35);
+  // Fuse boxes on North Wall
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = '#475569'; ctx.fillRect(660 + i * 45, 925, 30, 25); ctx.strokeRect(660 + i * 45, 925, 30, 25);
   }
 
-  // ENGINES
+  // 10 & 13. ENGINES (Upper: 240, 320 / Lower: 240, 1040)
   const drawEngineTurbine = (x: number, y: number) => {
     ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.roundRect(x - 35, y - 40, 70, 80, 16); ctx.fill(); ctx.stroke();
     const enginePulse = Math.sin(time / 200 + x) * 0.2 + 0.8;
     const plasmaGrad = ctx.createRadialGradient(x, y, 5, x, y, 30);
-    plasmaGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * enginePulse})`); plasmaGrad.addColorStop(0.7, `rgba(2, 132, 199, ${0.55 * enginePulse})`); plasmaGrad.addColorStop(1, 'transparent');
+    plasmaGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * enginePulse})`);
+    plasmaGrad.addColorStop(0.7, `rgba(2, 132, 199, ${0.55 * enginePulse})`);
+    plasmaGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = plasmaGrad; ctx.beginPath(); ctx.arc(x, y, 30, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#64748b';
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
-      const rotAngle = a + (time / 600);
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(rotAngle) * 26, y + Math.sin(rotAngle) * 26); ctx.stroke();
-    }
-    ctx.strokeStyle = '#64748b'; ctx.beginPath(); ctx.moveTo(x, y-40); ctx.lineTo(x, y-80); ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y-60, 10, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(x, y-60); ctx.lineTo(x+8, y-60); ctx.stroke();
-    ctx.fillStyle = '#475569'; ctx.fillRect(x-60, y-20, 20, 40);
   };
-  drawEngineTurbine(435, 500); drawEngineTurbine(435, 1240);
+  drawEngineTurbine(400, 460);
+  drawEngineTurbine(400, 1180);
 
-  // SECURITY
-  const secX = 760; const secY = 740;
-  ctx.fillStyle = '#334155'; ctx.fillRect(secX - 40, secY, 80, 30); ctx.strokeRect(secX - 40, secY, 80, 30);
+  // 11. SECURITY (580, 720, 200, 200)
+  // CCTV Monitoring Desk
+  const secX = 640; const secY = 760;
+  ctx.fillStyle = '#334155'; ctx.fillRect(secX - 30, secY, 70, 26); ctx.strokeRect(secX - 30, secY, 70, 26);
   const screens = [
-    { x: secX - 34, y: secY - 24, w: 28, h: 18 }, { x: secX + 6, y: secY - 24, w: 28, h: 18 },
-    { x: secX - 34, y: secY - 46, w: 28, h: 18 }, { x: secX + 6, y: secY - 46, w: 28, h: 18 },
+    { x: secX - 25, y: secY - 22, w: 24, h: 16 }, { x: secX + 5, y: secY - 22, w: 24, h: 16 },
+    { x: secX - 25, y: secY - 42, w: 24, h: 16 }, { x: secX + 5, y: secY - 42, w: 24, h: 16 },
   ];
   for (let sIdx = 0; sIdx < screens.length; sIdx++) {
     const scr = screens[sIdx];
     ctx.fillStyle = '#064e3b'; ctx.fillRect(scr.x, scr.y, scr.w, scr.h); ctx.strokeRect(scr.x, scr.y, scr.w, scr.h);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; ctx.fillRect(scr.x, scr.y + ((time / 30 + sIdx * 5) % scr.h), scr.w, 2);
   }
-  if (Math.sin(time / 200) > 0) { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(secX + 30, secY - 50, 4, 0, Math.PI * 2); ctx.fill(); }
-  ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(secX, secY+40, 15, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#cbd5e1'; ctx.fillRect(secX-10, secY+5, 20, 10);
-  ctx.fillStyle = '#ef4444'; ctx.fillRect(secX-30, secY+5, 8, 8);
-  ctx.fillStyle = '#334155'; ctx.fillRect(secX-80, secY-40, 30, 70);
 
-  // REACTOR
-  const reactorX = 250; const reactorY = 840;
-  ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.arc(reactorX, reactorY, 78, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // 12. REACTOR (60, 640, 220, 360)
+  // Antimatter Core in Center
+  const reactorX = 170; const reactorY = 820;
+  ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.arc(reactorX, reactorY, 68, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   const reactorPulse = Math.sin(time / 250) * 0.2 + 0.8;
-  const coreGrad = ctx.createRadialGradient(reactorX, reactorY, 10, reactorX, reactorY, 68);
-  coreGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * reactorPulse})`); coreGrad.addColorStop(0.6, `rgba(14, 165, 233, ${0.65 * reactorPulse})`); coreGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
-  ctx.fillStyle = coreGrad; ctx.beginPath(); ctx.arc(reactorX, reactorY, 68, 0, Math.PI * 2); ctx.fill();
-  ctx.save(); ctx.translate(reactorX, reactorY); ctx.rotate(time / 1200); ctx.strokeStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(0, 0, 42, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = '#e0f2fe'; ctx.fillRect(-6, -45, 12, 6); ctx.fillRect(-6, 39, 12, 6); ctx.restore();
-  ctx.strokeStyle = '#0284c7'; ctx.beginPath(); ctx.moveTo(reactorX, reactorY - 78); ctx.lineTo(reactorX, 640); ctx.moveTo(reactorX, reactorY + 78); ctx.lineTo(reactorX, 1040); ctx.stroke();
-  ctx.fillStyle = '#475569'; ctx.fillRect(150, 680, 30, 40); ctx.fillRect(150, 980, 30, 40);
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(155, 690, 20, 20); ctx.fillRect(155, 990, 20, 20);
-  ctx.fillStyle = '#f59e0b'; ctx.fillRect(350, 800, 40, 40); ctx.fillStyle = '#000'; ctx.fillText('☢', 370, 825);
-  ctx.fillStyle = '#334155'; ctx.fillRect(180, 780, 10, 120); ctx.fillRect(310, 780, 10, 120);
-  ctx.fillStyle = '#ef4444'; ctx.fillRect(200, 640, 20, 30);
+  const coreGrad = ctx.createRadialGradient(reactorX, reactorY, 10, reactorX, reactorY, 60);
+  coreGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * reactorPulse})`);
+  coreGrad.addColorStop(0.6, `rgba(14, 165, 233, ${0.65 * reactorPulse})`);
+  coreGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = coreGrad; ctx.beginPath(); ctx.arc(reactorX, reactorY, 60, 0, Math.PI * 2); ctx.fill();
 
-  // MEDBAY
-  const scanPadX = 860; const scanPadY = 500;
-  ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 44, 26, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // 14. MEDBAY (680, 500, 260, 260)
+  // Hologram Scan Pad at Bottom-Right
+  const scanPadX = 840; const scanPadY = 680;
+  ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 40, 24, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   const medbayPulse = Math.sin(time / 250) * 0.25 + 0.75;
-  ctx.strokeStyle = `rgba(52, 211, 153, ${medbayPulse})`; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 34, 18, 0, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 18, 10, 0, 0, Math.PI * 2); ctx.stroke();
-  const scanGrad = ctx.createLinearGradient(scanPadX, scanPadY - 40, scanPadX, scanPadY);
-  scanGrad.addColorStop(0, 'rgba(52, 211, 153, 0)'); scanGrad.addColorStop(1, `rgba(52, 211, 153, ${0.35 * medbayPulse})`);
-  ctx.fillStyle = scanGrad; ctx.fillRect(scanPadX - 25, scanPadY - 40, 50, 40);
-  const beds = [{ x: 670, y: 380 }, { x: 740, y: 380 }];
+  ctx.strokeStyle = `rgba(52, 211, 153, ${medbayPulse})`; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 30, 16, 0, 0, Math.PI * 2); ctx.stroke();
+  // 3 Hospital Beds along North Wall
+  const beds = [{ x: 720, y: 540 }, { x: 780, y: 540 }, { x: 840, y: 540 }];
   for (const bed of beds) {
-    ctx.fillStyle = '#334155'; ctx.fillRect(bed.x - 16, bed.y - 20, 32, 40); ctx.fillStyle = '#0284c7'; ctx.fillRect(bed.x - 14, bed.y - 8, 28, 26);
-    ctx.fillStyle = '#f8fafc'; ctx.fillRect(bed.x - 12, bed.y - 18, 24, 8); ctx.strokeRect(bed.x - 16, bed.y - 20, 32, 40);
+    ctx.fillStyle = '#334155'; ctx.fillRect(bed.x - 16, bed.y - 20, 32, 40); ctx.strokeRect(bed.x - 16, bed.y - 20, 32, 40);
+    ctx.fillStyle = '#0284c7'; ctx.fillRect(bed.x - 14, bed.y - 8, 28, 26);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(bed.x - 12, bed.y - 18, 24, 8);
   }
-  ctx.strokeStyle = '#22c55e'; ctx.beginPath(); ctx.moveTo(900, 380); ctx.lineTo(900, 420); ctx.moveTo(920, 380); ctx.lineTo(920, 420); ctx.stroke();
-  ctx.fillStyle = '#e2e8f0'; ctx.fillRect(800, 380, 40, 20);
-  ctx.fillStyle = '#94a3b8'; ctx.fillRect(820, 480, 20, 20);
-  ctx.strokeStyle = '#cbd5e1'; ctx.beginPath(); ctx.moveTo(640, 360); ctx.lineTo(640, 420); ctx.stroke(); ctx.fillStyle='#38bdf8'; ctx.fillRect(635, 370, 10, 15);
-  ctx.fillStyle = '#ef4444'; ctx.fillRect(650, 440, 20, 15);
 }
 
-// Emergency Button in Cafeteria (Authentic red dome with glass lid)
 function drawEmergencyButton(ctx: CanvasRenderingContext2D, localPlayer: Player, time: number) {
-  const dist = Math.hypot(localPlayer.x - EMERGENCY_BUTTON_POS.x, localPlayer.y - EMERGENCY_BUTTON_POS.y);
-  const isNear = dist < 140 && localPlayer.isAlive && !localPlayer.inVent;
+  const { x, y, radius } = EMERGENCY_BUTTON_POS;
+  const dist = Math.hypot(localPlayer.x - x, localPlayer.y - y);
+  const isNearby = dist <= radius + 55;
 
-  const bx = EMERGENCY_BUTTON_POS.x;
-  const by = EMERGENCY_BUTTON_POS.y;
+  ctx.save();
+  // Button Base
+  ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = isNearby ? '#ef4444' : '#0f172a'; ctx.lineWidth = isNearby ? 4 : 2; ctx.stroke();
 
-  // Base Pedestal
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(bx, by, 32, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+  // Glass Dome
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.25)'; ctx.beginPath(); ctx.arc(x, y, radius - 6, 0, Math.PI * 2); ctx.fill();
 
-  // Glass Case Outer Ring
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-  ctx.beginPath();
-  ctx.arc(bx, by, 27, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(186, 230, 253, 0.75)';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  // Red Center Plunger Button
+  const btnPulse = isNearby ? Math.sin(time / 150) * 2 : 0;
+  ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(x, y, radius - 16 + btnPulse, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#991b1b'; ctx.lineWidth = 2; ctx.stroke();
 
-  // Big Red Button Dome
-  const buttonPulse = isNear ? Math.sin(time / 150) * 0.15 + 0.85 : 1;
-  ctx.fillStyle = '#dc2626';
-  ctx.beginPath();
-  ctx.arc(bx, by, 19 * buttonPulse, 0, Math.PI * 2);
-  ctx.fill();
+  if (isNearby) {
+    drawGlowCircle(ctx, x, y, radius - 16, 'rgba(239, 68, 68, 0.4)', 15);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('USE [SPACE]', x, y - radius - 12);
+  }
+  ctx.restore();
+}
 
-  ctx.fillStyle = '#ef4444';
-  ctx.beginPath();
-  ctx.arc(bx - 3, by - 3, 13 * buttonPulse, 0, Math.PI * 2);
-  ctx.fill();
+function drawVents(ctx: CanvasRenderingContext2D, localPlayer: Player, time: number) {
+  const isImpostor = localPlayer.role === 'impostor';
 
-  // Button Top Highlight
-  ctx.fillStyle = '#fca5a5';
-  ctx.beginPath();
-  ctx.ellipse(bx - 4, by - 6, 6, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Nearby Interactive Glow & Floating Prompt
-  if (isNear) {
-    drawGlowCircle(ctx, bx, by, 34, 'rgba(239, 68, 68, 0.45)', 25);
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.arc(bx, by, 36, 0, Math.PI * 2);
-    ctx.stroke();
+  for (const vent of VENTS) {
+    const dist = Math.hypot(localPlayer.x - vent.x, localPlayer.y - vent.y);
+    const isNearby = dist <= 60;
 
     ctx.save();
-    ctx.font = 'bold 12px ui-monospace, SFMono-Regular, monospace';
-    ctx.fillStyle = '#fbbf24';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = '#000000';
-    ctx.shadowBlur = 5;
-    ctx.fillText('MEETING [SPACE]', bx, by - 42);
+    // Metal Rim
+    ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.roundRect(vent.x - 22, vent.y - 15, 44, 30, 4); ctx.fill();
+    ctx.strokeStyle = isImpostor && isNearby ? '#ef4444' : '#0f172a'; ctx.lineWidth = isImpostor && isNearby ? 3 : 1.5; ctx.stroke();
+
+    // Dark Vent Slits
+    ctx.fillStyle = '#0f172a';
+    for (let i = -10; i <= 10; i += 7) {
+      ctx.fillRect(vent.x - 16, vent.y + i - 1.5, 32, 3);
+    }
+
+    if (isImpostor && isNearby) {
+      drawGlowCircle(ctx, vent.x, vent.y, 22, 'rgba(239, 68, 68, 0.35)', 12);
+    }
     ctx.restore();
   }
 }
 
-// Impostor Vents
-function drawVents(ctx: CanvasRenderingContext2D, localPlayer: Player, time: number) {
-  const isImpostor = localPlayer.role === 'impostor' && localPlayer.isAlive;
-  const isLocalInVent = isImpostor && !!localPlayer.inVent;
-  const currentVent = isLocalInVent && localPlayer.ventId ? VENTS.find((v) => v.id === localPlayer.ventId) : null;
-
-  for (const vent of VENTS) {
-    const isCurrentVent = isLocalInVent && vent.id === localPlayer.ventId;
-    const isConnectedToCurrent = isLocalInVent && currentVent?.connectedVents.includes(vent.id);
-    const dist = Math.hypot(localPlayer.x - vent.x, localPlayer.y - vent.y);
-    const isNear = !isLocalInVent && dist < 85 && isImpostor;
-
-    // Vent Outer Steel Plate
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.roundRect(vent.x - 24, vent.y - 18, 48, 36, 6);
-    ctx.fill();
-    ctx.strokeStyle = isCurrentVent || isConnectedToCurrent || isNear ? '#ef4444' : '#0f172a';
-    ctx.lineWidth = isCurrentVent ? 4 : isConnectedToCurrent || isNear ? 3.5 : 2.5;
-    ctx.stroke();
-
-    // Dark Vent Cavity
-    ctx.fillStyle = isCurrentVent ? '#3b0707' : '#090d16';
-    ctx.fillRect(vent.x - 20, vent.y - 14, 40, 28);
-
-    // Metal Grate Slats
-    ctx.strokeStyle = isCurrentVent ? '#fca5a5' : isConnectedToCurrent || isNear ? '#f87171' : '#475569';
-    ctx.lineWidth = 2.5;
-    for (let dy = -10; dy <= 10; dy += 5) {
-      ctx.beginPath();
-      ctx.moveTo(vent.x - 18, vent.y + dy);
-      ctx.lineTo(vent.x + 18, vent.y + dy);
-      ctx.stroke();
-    }
-
-    // Interactive Visual Highlights & Prompts
-    if (isCurrentVent) {
-      // Glow under player in vent
-      drawGlowCircle(ctx, vent.x, vent.y, 30, 'rgba(239, 68, 68, 0.5)', 20);
-      ctx.save();
-      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
-      ctx.fillStyle = '#fca5a5';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 5;
-      ctx.fillText('EXIT [V / ESC]', vent.x, vent.y - 26);
-      ctx.restore();
-    } else if (isConnectedToCurrent) {
-      // Flashing directional marker for travel targets
-      const pulse = Math.sin(time / 150) * 0.2 + 0.8;
-      drawGlowCircle(ctx, vent.x, vent.y, 24, `rgba(239, 68, 68, ${0.4 * pulse})`, 16);
-      ctx.save();
-      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
-      ctx.fillStyle = '#ef4444';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 5;
-      ctx.fillText(`➔ ${vent.room}`, vent.x, vent.y - 26);
-      ctx.restore();
-    } else if (isNear) {
-      drawGlowCircle(ctx, vent.x, vent.y, 26, 'rgba(239, 68, 68, 0.35)', 16);
-      ctx.save();
-      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
-      ctx.fillStyle = '#ef4444';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 5;
-      ctx.fillText('VENT [V]', vent.x, vent.y - 26);
-      ctx.restore();
-    }
-  }
-}
-
-// Task Interactive Stations
 function drawTaskStations(
   ctx: CanvasRenderingContext2D,
   localPlayer: Player,
   activeTaskId: string | null,
   time: number
 ) {
+  const isAlive = localPlayer.isAlive;
+
   for (const task of ALL_TASKS) {
-    const isAssigned = localPlayer.assignedTasks.includes(task.id);
-    const isDone = localPlayer.completedTasks.includes(task.id);
     const dist = Math.hypot(localPlayer.x - task.x, localPlayer.y - task.y);
-    const isNear = dist < 75 && localPlayer.isAlive && !localPlayer.inVent;
+    const isNearby = dist <= 65;
 
-    // Terminal Panel Box
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.roundRect(task.x - 18, task.y - 18, 36, 36, 6);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-
-    // Terminal Screen
-    let screenColor = '#475569'; // Default inactive gray
-    if (isDone) {
-      screenColor = '#10b981'; // Green completed
-    } else if (isAssigned) {
-      screenColor = localPlayer.role === 'impostor' ? '#f87171' : '#fbbf24'; // Yellow assigned / Red fake
-    }
-
-    ctx.fillStyle = screenColor;
-    ctx.fillRect(task.x - 13, task.y - 13, 26, 26);
-
-    // Screen Scanlines
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-    ctx.fillRect(task.x - 13, task.y - 7, 26, 2);
-    ctx.fillRect(task.x - 13, task.y + 1, 26, 2);
-    ctx.fillRect(task.x - 13, task.y + 9, 26, 2);
-
-    // Nearby Prompt & Glow
-    if (isNear && isAssigned && !isDone) {
-      const pulse = Math.sin(time / 200) * 0.3 + 0.7;
-      ctx.strokeStyle = `rgba(245, 158, 11, ${pulse})`;
-      ctx.lineWidth = 4;
-      ctx.strokeRect(task.x - 20, task.y - 20, 40, 40);
-
-      // Yellow Glowing Exclamation Mark
-      ctx.save();
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillStyle = '#fbbf24';
-      ctx.textAlign = 'center';
-      ctx.fillText('!', task.x, task.y - 28);
-
-      ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
-      ctx.fillStyle = '#fbbf24';
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 5;
-      ctx.fillText('USE [SPACE]', task.x, task.y - 44);
-      ctx.restore();
-    }
-  }
-}
-
-// Security Cameras mounted on the corridor bulkheads
-function drawSecurityCameras(ctx: CanvasRenderingContext2D, isSecurityCamActive: boolean, time: number) {
-  for (const cam of SECURITY_CAMERAS) {
     ctx.save();
-    ctx.translate(cam.x, cam.y);
+    // Glowing task pedestal indicator
+    const pulse = Math.sin(time / 200) * 0.2 + 0.8;
+    ctx.fillStyle = `rgba(234, 179, 8, ${0.35 * pulse})`;
+    ctx.beginPath(); ctx.arc(task.x, task.y, 16, 0, Math.PI * 2); ctx.fill();
 
-    // Wall Mount Bracket
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-8, -8, 16, 16);
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-8, -8, 16, 16);
+    ctx.fillStyle = '#eab308';
+    ctx.beginPath(); ctx.arc(task.x, task.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ca8a04'; ctx.lineWidth = 2; ctx.stroke();
 
-    // Camera Lens Body
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0284c7';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Red blinking LED when someone is in Security viewing CCTV!
-    const isBlinking = isSecurityCamActive && Math.sin(time / 150) > 0;
-    ctx.fillStyle = isSecurityCamActive ? (isBlinking ? '#ef4444' : '#7f1d1d') : '#22c55e';
-    ctx.beginPath();
-    ctx.arc(0, 0, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (isSecurityCamActive && isBlinking) {
-      drawGlowCircle(ctx, 0, 0, 7, 'rgba(239, 68, 68, 0.85)', 12);
+    if (isNearby && isAlive) {
+      drawGlowCircle(ctx, task.x, task.y, 14, 'rgba(234, 179, 8, 0.8)', 16);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(task.name, task.x, task.y - 18);
     }
-
     ctx.restore();
   }
 }
 
-// Locked Doors (during Impostor Door Sabotage)
+function drawSecurityCameras(ctx: CanvasRenderingContext2D, isSecurityCamActive: boolean, time: number) {
+  for (const cam of SECURITY_CAMERAS) {
+    ctx.save();
+    ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(cam.x, cam.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Red Blinking Lens when watched
+    if (isSecurityCamActive) {
+      const blink = Math.sin(time / 150) > 0;
+      if (blink) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(cam.x, cam.y, 4, 0, Math.PI * 2); ctx.fill();
+        drawGlowCircle(ctx, cam.x, cam.y, 5, 'rgba(239, 68, 68, 0.8)', 10);
+      }
+    } else {
+      ctx.fillStyle = '#64748b';
+      ctx.beginPath(); ctx.arc(cam.x, cam.y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 function drawLockedDoors(ctx: CanvasRenderingContext2D, lockedDoors: Record<string, number>, time: number) {
   const now = Date.now();
-  const roomDoorways: Record<string, Array<{ x: number; y: number; w: number; h: number }>> = {
-    cafeteria: [
-      { x: 890, y: 460, w: 25, h: 120 },
-      { x: 1475, y: 460, w: 25, h: 120 },
-      { x: 1060, y: 890, w: 200, h: 25 },
-    ],
-    medbay: [
-      { x: 930, y: 460, w: 25, h: 100 },
-      { x: 670, y: 610, w: 120, h: 25 },
-    ],
-    security: [
-      { x: 670, y: 630, w: 120, h: 25 },
-      { x: 670, y: 890, w: 120, h: 25 },
-      { x: 610, y: 740, w: 25, h: 120 },
-    ],
-    electrical: [
-      { x: 670, y: 910, w: 120, h: 25 },
-      { x: 930, y: 1080, w: 25, h: 120 },
-    ],
-    storage: [
-      { x: 1060, y: 1010, w: 200, h: 25 },
-      { x: 890, y: 1080, w: 25, h: 120 },
-      { x: 1390, y: 1020, w: 25, h: 120 },
-    ],
-    admin: [
-      { x: 1460, y: 960, w: 25, h: 120 },
-    ],
-    reactor: [
-      { x: 200, y: 560, w: 140, h: 25 },
-      { x: 200, y: 1020, w: 140, h: 25 },
-      { x: 420, y: 720, w: 25, h: 120 },
-    ],
-    upper_engine: [
-      { x: 600, y: 440, w: 25, h: 120 },
-      { x: 200, y: 580, w: 140, h: 25 },
-    ],
-    lower_engine: [
-      { x: 600, y: 1140, w: 25, h: 120 },
-      { x: 200, y: 1060, w: 140, h: 25 },
-    ],
-  };
+  for (const [roomKey, expiry] of Object.entries(lockedDoors)) {
+    if (expiry > now) {
+      const normalizedKey = roomKey.toLowerCase().replace(/\s+/g, '_');
+      const doorList = LOCKED_DOOR_WALLS[normalizedKey] || LOCKED_DOOR_WALLS[roomKey.toLowerCase()];
+      if (doorList) {
+        for (const door of doorList) {
+          ctx.save();
+          ctx.fillStyle = '#7f1d1d';
+          ctx.fillRect(door.x, door.y, door.width, door.height);
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(door.x, door.y, door.width, door.height);
 
-  for (const [room, expiry] of Object.entries(lockedDoors)) {
-    const normalized = room.toLowerCase().replace(/\s+/g, '_');
-    const doors = roomDoorways[normalized] || roomDoorways[room.toLowerCase()];
-    if (expiry > now && doors) {
-      for (const door of doors) {
-        // Red blast door bulkheads
-        ctx.fillStyle = '#7f1d1d';
-        ctx.fillRect(door.x, door.y, door.w, door.h);
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(door.x, door.y, door.w, door.h);
-
-        // Hazard diagonal stripes on locked door
-        ctx.fillStyle = '#ef4444';
-        ctx.font = 'bold 12px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('LOCKED', door.x + door.w / 2, door.y + door.h / 2 + 4);
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('LOCKED', door.x + door.width / 2, door.y + door.height / 2 + 3);
+          ctx.restore();
+        }
       }
     }
   }
 }
 
-// Dead Bodies on the floor (filtered by Line of Sight & Distance)
 function drawDeadBodies(
   ctx: CanvasRenderingContext2D,
   deadBodies: DeadBody[],
@@ -1054,8 +764,6 @@ function drawDeadBodies(
     if (body.reported) continue;
 
     const dist = Math.hypot(body.x - localPlayer.x, body.y - localPlayer.y);
-
-    // Line of sight check for living players
     if (!isLocalGhost) {
       if (dist > visionRadius) continue;
       if (!hasLineOfSight(localPlayer.x, localPlayer.y, body.x, body.y, lockedDoors)) continue;
@@ -1066,62 +774,25 @@ function drawDeadBodies(
     ctx.save();
     ctx.translate(body.x, body.y);
 
-    // Blood Pool on Floor
+    // Blood Pool
     ctx.fillStyle = 'rgba(185, 28, 28, 0.8)';
-    ctx.beginPath();
-    ctx.ellipse(0, 8, 32, 18, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 10, 24, 14, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Secondary blood splatters
-    ctx.fillStyle = 'rgba(153, 27, 27, 0.65)';
-    ctx.beginPath();
-    ctx.arc(-24, 14, 6, 0, Math.PI * 2);
-    ctx.arc(26, 6, 7, 0, Math.PI * 2);
-    ctx.arc(10, 24, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body Lower Half (Pants & Stubby Legs)
+    // Lower half of body
     ctx.fillStyle = colInfo.hex;
-    ctx.beginPath();
-    ctx.roundRect(-16, -2, 32, 18, [0, 0, 6, 6]);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 4;
-    ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-14, -6, 28, 20, [0, 0, 8, 8]); ctx.fill();
+    ctx.strokeStyle = '#000000'; ctx.lineWidth = 2.5; ctx.stroke();
 
-    // Cut Meat Surface (Red slice)
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.ellipse(0, -2, 16, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Protruding Vertebra Bone
+    // Bone sticking out
     ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(-3, -18, 6, 16);
-    ctx.beginPath();
-    ctx.arc(-3, -18, 4, 0, Math.PI * 2);
-    ctx.arc(3, -18, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3;
+    ctx.fillRect(-3, -16, 6, 12);
+    ctx.beginPath(); ctx.arc(-3, -16, 4, 0, Math.PI * 2); ctx.arc(3, -16, 4, 0, Math.PI * 2); ctx.fill();
     ctx.stroke();
-
-    // Floating Reportable Tag
-    ctx.font = '900 11px ui-monospace, SFMono-Regular, monospace';
-    ctx.fillStyle = '#fca5a5';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = '#000000';
-    ctx.shadowBlur = 5;
-    ctx.fillText(`${body.playerName.toUpperCase()} [TOT]`, 0, 36);
 
     ctx.restore();
   }
 }
 
-// Draw Players (filtered by Line of Sight & Distance for true stealth)
 function drawPlayers(
   ctx: CanvasRenderingContext2D,
   players: Record<string, Player>,
@@ -1132,426 +803,105 @@ function drawPlayers(
 ) {
   const isLocalGhost = !localPlayer.isAlive;
   const isLightsOut = activeSabotage?.type === 'lights';
-  const visionRadius = (localPlayer.role === 'impostor' || isLocalGhost) ? 380 : isLightsOut ? 110 : 280;
+  const visionRadius = localPlayer.role === 'impostor' ? 380 : isLightsOut ? 110 : 280;
 
-  // 1. Y-Sort all players so players lower on screen render in front
   const sortedPlayers = Object.values(players).sort((a, b) => a.y - b.y);
 
-  for (const p of sortedPlayers) {
-    // If player is in vent, only draw for self or other Impostors
-    if (p.inVent && p.id !== localPlayer.id && localPlayer.role !== 'impostor') continue;
+  for (const player of sortedPlayers) {
+    if (player.inVent) continue;
 
-    // Ghosts are only visible to other ghosts, or local player to themselves
-    if (!p.isAlive && !isLocalGhost && p.id !== localPlayer.id) continue;
+    const isSelf = player.id === localPlayer.id;
+    const dist = Math.hypot(player.x - localPlayer.x, player.y - localPlayer.y);
 
-    const isLocal = p.id === localPlayer.id;
-    const dist = Math.hypot(p.x - localPlayer.x, p.y - localPlayer.y);
-
-    // Line of Sight & Distance check for living crewmates
-    if (!isLocal && !isLocalGhost) {
-      if (dist > visionRadius) continue;
-      if (!hasLineOfSight(localPlayer.x, localPlayer.y, p.x, p.y, lockedDoors)) continue;
+    // Ghost visibility: only other ghosts can see ghosts (and self)
+    if (!player.isAlive) {
+      if (!isLocalGhost && !isSelf) continue;
+    } else {
+      // Living player visibility by LOS
+      if (!isLocalGhost && !isSelf) {
+        if (dist > visionRadius) continue;
+        if (!hasLineOfSight(localPlayer.x, localPlayer.y, player.x, player.y, lockedDoors)) continue;
+      }
     }
 
+    const colInfo = PLAYER_COLORS.find((c) => c.id === player.color) || PLAYER_COLORS[0];
 
     ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.translate(player.x, player.y);
 
-    const isGhost = !p.isAlive;
-    const isLeft = p.facing === 'left';
-    const isMoving = p.isMoving;
-
-    if (p.inVent) {
-      ctx.globalAlpha = 0.5;
-    } else if (isGhost) {
-      // Ghosts are translucent
+    if (!player.isAlive) {
       ctx.globalAlpha = 0.55;
     }
 
-    const col = PLAYER_COLORS.find((c) => c.id === p.color) || PLAYER_COLORS[0];
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath(); ctx.ellipse(0, 18, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Flip horizontal if facing left
-    if (isLeft) {
-      ctx.scale(-1, 1);
+    // Backpack
+    ctx.fillStyle = colInfo.shadow;
+    ctx.beginPath(); ctx.roundRect(-18, -8, 8, 18, 4); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5; ctx.stroke();
+
+    // Crewmate Body
+    ctx.fillStyle = colInfo.hex;
+    ctx.beginPath(); ctx.roundRect(-12, -18, 24, 32, [12, 12, 6, 6]); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5; ctx.stroke();
+
+    // Visor Glass
+    ctx.fillStyle = '#7dd3fc';
+    ctx.beginPath(); ctx.roundRect(2, -12, 14, 10, 5); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(6, -10, 4, 2, -0.3, 0, Math.PI * 2); ctx.fill();
+
+    // Hat
+    if (player.hat && player.hat !== 'none') {
+      drawPlayerCanvasHat(ctx, player.hat, !player.isAlive);
     }
 
-    // Walking bobbing motion (up & down)
-    const walkBob = isMoving && !isGhost ? Math.abs(Math.sin(time / 80)) * 4 : 0;
-    const ghostFloat = isGhost ? Math.sin(time / 300 + p.x) * 6 : 0;
-
-    ctx.translate(0, -walkBob + ghostFloat);
-
-    // 1. Drop Shadow under player (unless ghost)
-    if (!isGhost) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-      ctx.beginPath();
-      ctx.ellipse(0, 22 + walkBob, 18, 7, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    if (!isGhost) {
-      // ----------------------------------------------------
-      // LIVING CREWMATE (Authentic Egg-Bean Shape + 2-tone Shading)
-      // ----------------------------------------------------
-      // Oxygen Tank / Backpack
-      ctx.fillStyle = col.hex;
-      ctx.beginPath();
-      ctx.roundRect(-22, -12, 12, 28, 6);
-      ctx.fill();
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Backpack bottom shadow
-      ctx.fillStyle = col.shadow;
-      ctx.beginPath();
-      ctx.roundRect(-22, 2, 12, 14, [0, 0, 6, 6]);
-      ctx.fill();
-
-      // Legs Animation (Walking Swing)
-      const legSwing = isMoving ? Math.sin(time / 80) * 6 : 0;
-
-      // Left Leg
-      ctx.fillStyle = col.shadow;
-      ctx.beginPath();
-      ctx.roundRect(-12 - legSwing, 14, 10, 14, 5);
-      ctx.fill();
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Right Leg
-      ctx.fillStyle = col.shadow;
-      ctx.beginPath();
-      ctx.roundRect(4 + legSwing, 14, 10, 14, 5);
-      ctx.fill();
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Main Bean Body
-      ctx.fillStyle = col.hex;
-      ctx.beginPath();
-      ctx.roundRect(-16, -24, 34, 42, 15);
-      ctx.fill();
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Body 2-Tone Shadow (Bottom belly curve)
-      ctx.fillStyle = col.shadow;
-      ctx.beginPath();
-      ctx.roundRect(-16, 2, 34, 16, [0, 0, 15, 15]);
-      ctx.fill();
-
-      // Visor (Cyan / Sky-Blue Oval)
-      ctx.fillStyle = col.visor;
-      ctx.beginPath();
-      ctx.roundRect(2, -16, 20, 14, 7);
-      ctx.fill();
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
-
-      // Visor Top Glass Reflection (Pure White curved gleam)
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.roundRect(5, -14, 11, 4, 2);
-      ctx.fill();
-
-      // Custom Hat on Player Head
-      drawPlayerCanvasHat(ctx, p.hat, isGhost);
-    } else {
-      // ----------------------------------------------------
-      // GHOST CREWMATE (Translucent wavy ghost bean)
-      // ----------------------------------------------------
-      ctx.fillStyle = col.hex;
-      ctx.beginPath();
-      ctx.moveTo(-16, -10);
-      ctx.bezierCurveTo(-16, -26, 16, -26, 16, -10);
-      ctx.lineTo(16, 12);
-      // Wavy ghost tail
-      const wave = Math.sin(time / 150) * 4;
-      ctx.quadraticCurveTo(8 + wave, 22, 0, 14);
-      ctx.quadraticCurveTo(-8 - wave, 22, -16, 12);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      // Ghost Visor
-      ctx.fillStyle = col.visor;
-      ctx.beginPath();
-      ctx.roundRect(2, -16, 18, 12, 6);
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-
-    // ----------------------------------------------------
-    // Player Name Tag & Impostor Recognition
-    // ----------------------------------------------------
-    if (isLeft) {
-      ctx.scale(-1, 1);
-    }
-
-    ctx.font = '900 12px ui-monospace, SFMono-Regular, sans-serif';
-    const isLocalImpostor = localPlayer.role === 'impostor';
-    const isPlayerImpostor = p.role === 'impostor';
-
-    // Impostors see fellow impostors in bold red
-    const isRedName = isLocalImpostor && isPlayerImpostor;
-
-    // Text Shadow
-    ctx.fillStyle = '#000000';
+    // Player Name Tag
+    ctx.fillStyle = player.role === 'impostor' && localPlayer.role === 'impostor' ? '#ef4444' : '#ffffff';
+    ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.name, 1, -31);
-    ctx.fillText(p.name, -1, -31);
-    ctx.fillText(p.name, 0, -30);
-
-    // Text Foreground
-    ctx.fillStyle = isRedName ? '#ef4444' : isGhost ? '#94a3b8' : '#f8fafc';
-    ctx.fillText(p.name, 0, -32);
-
-    // "DU" (YOU) indicator on local player
-    if (isLocal) {
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 9px sans-serif';
-      ctx.fillText('▼', 0, -44);
-    }
+    ctx.fillText(player.name, 0, -26);
 
     ctx.restore();
   }
 }
 
-// ----------------------------------------------------
-// Draw 2D Canvas Hats on Players
-// ----------------------------------------------------
 function drawPlayerCanvasHat(ctx: CanvasRenderingContext2D, hat?: HatType, isGhost?: boolean) {
-  if (!hat || hat === 'none' || isGhost) return;
-
+  if (!hat || hat === 'none') return;
   ctx.save();
-  switch (hat) {
-    case 'tophat':
-      ctx.fillStyle = '#1e293b';
-      ctx.beginPath();
-      ctx.ellipse(2, -26, 14, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(-6, -42, 16, 16);
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(-6, -30, 16, 4);
-      break;
-    case 'crown':
-      ctx.fillStyle = '#fbbf24';
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-10, -26);
-      ctx.lineTo(-12, -38);
-      ctx.lineTo(-4, -30);
-      ctx.lineTo(2, -42);
-      ctx.lineTo(8, -30);
-      ctx.lineTo(16, -38);
-      ctx.lineTo(14, -26);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      break;
-    case 'sprout':
-      ctx.strokeStyle = '#16a34a';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(2, -26);
-      ctx.quadraticCurveTo(4, -36, 2, -42);
-      ctx.stroke();
-      ctx.fillStyle = '#22c55e';
-      ctx.beginPath();
-      ctx.ellipse(-3, -42, 6, 3, -0.5, 0, Math.PI * 2);
-      ctx.ellipse(7, -40, 6, 3, 0.5, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'party':
-      ctx.fillStyle = '#ec4899';
-      ctx.beginPath();
-      ctx.moveTo(-8, -26);
-      ctx.lineTo(2, -48);
-      ctx.lineTo(12, -26);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#fbbf24';
-      ctx.beginPath();
-      ctx.arc(2, -48, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'knife':
-      ctx.fillStyle = '#cbd5e1';
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = 2;
-      ctx.fillRect(-18, -28, 28, 5);
-      ctx.strokeRect(-18, -28, 28, 5);
-      ctx.fillStyle = '#78350f';
-      ctx.fillRect(10, -29, 8, 7);
-      break;
-    case 'dum':
-      ctx.fillStyle = '#fef08a';
-      ctx.strokeStyle = '#ca8a04';
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(0, -22, 16, 12);
-      ctx.strokeRect(0, -22, 16, 12);
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 7px sans-serif';
-      ctx.fillText('DUM', 8, -13);
-      break;
-    case 'devil':
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath();
-      ctx.moveTo(-8, -26);
-      ctx.lineTo(-14, -38);
-      ctx.lineTo(-2, -30);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(8, -26);
-      ctx.lineTo(14, -38);
-      ctx.lineTo(2, -30);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case 'halo':
-      ctx.strokeStyle = '#fde047';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.ellipse(2, -36, 14, 5, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      break;
-    case 'goggles':
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-6, -26, 20, 6);
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(-1, -23, 4, 0, Math.PI * 2);
-      ctx.arc(9, -23, 4, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'viking':
-      ctx.fillStyle = '#64748b';
-      ctx.beginPath();
-      ctx.arc(2, -26, 12, Math.PI, 0);
-      ctx.fill();
-      ctx.fillStyle = '#f8fafc';
-      ctx.beginPath();
-      ctx.moveTo(-10, -26);
-      ctx.lineTo(-18, -38);
-      ctx.lineTo(-6, -30);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(14, -26);
-      ctx.lineTo(22, -38);
-      ctx.lineTo(10, -30);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case 'beanie':
-      ctx.fillStyle = '#0284c7';
-      ctx.beginPath();
-      ctx.arc(2, -26, 12, Math.PI, 0);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(2, -38, 4, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'cap':
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath();
-      ctx.arc(2, -26, 12, Math.PI, 0);
-      ctx.fill();
-      ctx.fillRect(-12, -28, 8, 3);
-      break;
-    case 'egg':
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.ellipse(2, -26, 12, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#f59e0b';
-      ctx.beginPath();
-      ctx.arc(2, -28, 4, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    case 'cheese':
-      ctx.fillStyle = '#fbbf24';
-      ctx.beginPath();
-      ctx.moveTo(-8, -26);
-      ctx.lineTo(12, -26);
-      ctx.lineTo(4, -38);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case 'cat':
-      ctx.fillStyle = '#1e293b';
-      ctx.beginPath();
-      ctx.moveTo(-8, -26);
-      ctx.lineTo(-10, -36);
-      ctx.lineTo(-2, -30);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(8, -26);
-      ctx.lineTo(10, -36);
-      ctx.lineTo(2, -30);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case 'plague':
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-6, -28, 16, 6);
-      ctx.fillStyle = '#f8fafc';
-      ctx.beginPath();
-      ctx.moveTo(8, -22);
-      ctx.lineTo(22, -14);
-      ctx.lineTo(8, -16);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    case 'straw':
-      ctx.fillStyle = '#fde047';
-      ctx.beginPath();
-      ctx.ellipse(2, -26, 16, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(-4, -34, 12, 8);
-      break;
-    case 'cowboy':
-      ctx.fillStyle = '#78350f';
-      ctx.beginPath();
-      ctx.ellipse(2, -26, 18, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(-4, -36, 12, 10);
-      break;
-    case 'santa':
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath();
-      ctx.moveTo(-8, -26);
-      ctx.lineTo(8, -38);
-      ctx.lineTo(14, -26);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(-8, -28, 22, 4);
-      ctx.beginPath();
-      ctx.arc(10, -38, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    default:
-      break;
+  ctx.translate(0, -18);
+
+  if (hat === 'party') {
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(0, -18); ctx.lineTo(8, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
+  } else if (hat === 'beanie') {
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath(); ctx.arc(0, -2, 12, Math.PI, 0); ctx.fill();
+    ctx.stroke();
+  } else if (hat === 'crown') {
+    ctx.fillStyle = '#eab308';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0); ctx.lineTo(-10, -12); ctx.lineTo(-5, -6); ctx.lineTo(0, -14); ctx.lineTo(5, -6); ctx.lineTo(10, -12); ctx.lineTo(10, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (hat === 'tophat') {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-12, -2, 24, 4); ctx.fillRect(-8, -16, 16, 14); ctx.stroke();
+  } else if (hat === 'viking') {
+    ctx.fillStyle = '#78350f'; ctx.beginPath(); ctx.arc(0, 0, 12, Math.PI, 0); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-16, -10); ctx.lineTo(-8, -4); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(16, -10); ctx.lineTo(8, -4); ctx.fill();
+  } else {
+    // Default cap
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath(); ctx.arc(0, 0, 10, Math.PI, 0); ctx.lineTo(12, 0); ctx.fill(); ctx.stroke();
   }
   ctx.restore();
 }
-
-// Ship Walls & Structural Bulkheads (Solid barrier blocks)
 
 function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
   for (const wall of WALLS) {
@@ -1565,304 +915,169 @@ function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
     ctx.fillRect(wall.x, wall.y, wall.width, Math.min(6, wall.height));
 
     ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3;
     ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
 
-    if (wall.width > 20 && wall.height > 20) {
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(wall.x + wall.width / 2, wall.y + 6);
-      ctx.lineTo(wall.x + wall.width / 2, wall.y + wall.height);
-      ctx.stroke();
-
+    if (wall.width > 30 && wall.height > 30) {
+      // Rivets on structural pillars
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(wall.x + 4, wall.y + 10, 2, 2);
       ctx.fillRect(wall.x + wall.width - 6, wall.y + 10, 2, 2);
       ctx.fillRect(wall.x + 4, wall.y + wall.height - 6, 2, 2);
       ctx.fillRect(wall.x + wall.width - 6, wall.y + wall.height - 6, 2, 2);
-      
-      if (wall.width > 50) {
-         ctx.fillStyle = '#111';
-         ctx.fillRect(wall.x + 20, wall.y + 10, 20, 10);
-         ctx.strokeStyle = '#333';
-         ctx.beginPath();
-         for(let i=0; i<4; i++) {
-            ctx.moveTo(wall.x + 20, wall.y + 12 + i*2);
-            ctx.lineTo(wall.x + 40, wall.y + 12 + i*2);
-         }
-         ctx.stroke();
-      }
     }
   }
 }
 
-// Dynamic Vision & Lighting (Dramatic Fog of War + Flashlight cone + Crisis Strobes)
 function drawDynamicLighting(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
   localPlayer: Player,
-  activeSabotage?: ActiveSabotage | null,
-  time = 0
+  activeSabotage: ActiveSabotage | null | undefined,
+  time: number
 ) {
-  const centerX = canvasWidth / 2;
-  const centerY = canvasHeight / 2;
-
   const isGhost = !localPlayer.isAlive;
+  if (isGhost) return; // Ghosts see all
+
   const isLightsOut = activeSabotage?.type === 'lights';
-  const isAlarm = activeSabotage?.type === 'reactor' || activeSabotage?.type === 'o2';
+  const isImpostor = localPlayer.role === 'impostor';
+  const visionRadius = isImpostor ? 380 : isLightsOut ? 110 : 280;
 
-  // Vision Radius (Ghosts & Impostors have full vision!)
-  const visionRadius = (localPlayer.role === 'impostor' || isGhost)
-    ? 380
-    : isLightsOut
-    ? 110
-    : 280;
-
-  // Create soft radial vignette mask
-  const grad = ctx.createRadialGradient(
-    centerX,
-    centerY,
-    visionRadius * 0.45,
-    centerX,
-    centerY,
-    visionRadius * 1.25
-  );
-
-  if (isAlarm) {
-    // Red pulsing alarm strobe
-    const strobe = (Math.sin(time / 200) + 1) * 0.5;
-    grad.addColorStop(0, `rgba(239, 68, 68, ${0.12 * strobe})`);
-    grad.addColorStop(0.7, `rgba(127, 29, 29, ${0.4 + 0.25 * strobe})`);
-    grad.addColorStop(1, 'rgba(15, 23, 42, 0.96)');
-  } else if (isLightsOut && localPlayer.role !== 'impostor' && !isGhost) {
-    // Heavy black darkness during blackout for living crewmates
-    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    grad.addColorStop(0.6, 'rgba(2, 6, 23, 0.85)');
-    grad.addColorStop(1, 'rgba(2, 6, 23, 0.98)');
-  } else {
-    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    grad.addColorStop(0.7, 'rgba(3, 7, 18, 0.45)');
-    grad.addColorStop(1, 'rgba(2, 6, 23, 0.94)');
-  }
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-}
-
-interface SabotageTarget {
-  name: string;
-  room: string;
-  x: number;
-  y: number;
-}
-
-function getSabotageTargets(activeSabotage?: ActiveSabotage | null): SabotageTarget[] {
-  if (!activeSabotage) return [];
-  switch (activeSabotage.type) {
-    case 'o2':
-      return [
-        { name: 'O2: O2-RAUM', room: 'O2', x: 1740, y: 800 },
-        { name: 'O2: ADMIN', room: 'Admin', x: 1620, y: 1080 },
-      ];
-    case 'reactor':
-      return [
-        { name: 'REAKTOR (OBEN)', room: 'Reactor', x: 140, y: 620 },
-        { name: 'REAKTOR (UNTEN)', room: 'Reactor', x: 140, y: 820 },
-      ];
-    case 'lights':
-      return [
-        { name: 'ELEKTRIK (LICHTER)', room: 'Electrical', x: 670, y: 960 },
-      ];
-    case 'comms':
-      return [
-        { name: 'FUNKRAUM (COMMS)', room: 'Communications', x: 1480, y: 1400 },
-      ];
-    default:
-      return [];
-  }
-}
-
-// World-Space Glowing Sabotage Beacons (Drawn on the ship floor at repair terminals)
-function drawSabotageBeacons(
-  ctx: CanvasRenderingContext2D,
-  activeSabotage?: ActiveSabotage | null,
-  time = 0
-) {
-  const targets = getSabotageTargets(activeSabotage);
-  if (targets.length === 0) return;
-
-  const isCritical = activeSabotage?.type === 'o2' || activeSabotage?.type === 'reactor';
-  const pulse = (Math.sin(time / 150) + 1) * 0.5;
+  const screenCenterX = canvasWidth / 2;
+  const screenCenterY = canvasHeight / 2;
 
   ctx.save();
-  for (const t of targets) {
-    // Expanding sonar pulse waves
-    const ringRadius1 = 15 + ((time / 20) % 45);
-    const ringOpacity1 = Math.max(0, 1 - ringRadius1 / 60);
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, ringRadius1, 0, Math.PI * 2);
-    ctx.strokeStyle = isCritical
-      ? `rgba(239, 68, 68, ${ringOpacity1 * 0.85})`
-      : `rgba(245, 158, 11, ${ringOpacity1 * 0.85})`;
-    ctx.lineWidth = 3;
-    ctx.stroke();
+  const vignette = ctx.createRadialGradient(
+    screenCenterX,
+    screenCenterY,
+    visionRadius * 0.4,
+    screenCenterX,
+    screenCenterY,
+    visionRadius * 1.2
+  );
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(0.7, 'rgba(0, 0, 0, 0.4)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
 
-    const ringRadius2 = 15 + (((time / 20) + 22.5) % 45);
-    const ringOpacity2 = Math.max(0, 1 - ringRadius2 / 60);
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, ringRadius2, 0, Math.PI * 2);
-    ctx.strokeStyle = isCritical
-      ? `rgba(239, 68, 68, ${ringOpacity2 * 0.85})`
-      : `rgba(245, 158, 11, ${ringOpacity2 * 0.85})`;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Central glowing beacon core
-    const coreGrad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 28);
-    coreGrad.addColorStop(0, isCritical ? `rgba(239, 68, 68, ${0.7 + 0.3 * pulse})` : `rgba(245, 158, 11, ${0.7 + 0.3 * pulse})`);
-    coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = coreGrad;
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, 28, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Terminal Highlight Box
-    ctx.fillStyle = isCritical ? '#dc2626' : '#d97706';
-    ctx.beginPath();
-    ctx.arc(t.x, t.y, 9 + pulse * 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+  // Red Crisis Alarm Strobe during critical sabotage
+  if (activeSabotage && (activeSabotage.type === 'reactor' || activeSabotage.type === 'o2')) {
+    const strobe = (Math.sin(time / 180) + 1) / 2;
+    ctx.fillStyle = `rgba(239, 68, 68, ${0.15 * strobe})`;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
   }
   ctx.restore();
 }
 
-// Screen-Space Directional Navigation Arrows (Authentic Among Us Sabotage Indicators)
+interface SabotageTarget {
+  name: string;
+  x: number;
+  y: number;
+  label: string;
+  isCritical: boolean;
+}
+
+function getSabotageTargets(activeSabotage?: ActiveSabotage | null): SabotageTarget[] {
+  if (!activeSabotage) return [];
+
+  if (activeSabotage.type === 'reactor') {
+    return [
+      { name: 'Reaktor (Oben)', x: 100, y: 720, label: 'REAKTOR (OBEN)', isCritical: true },
+      { name: 'Reaktor (Unten)', x: 100, y: 920, label: 'REAKTOR (UNTEN)', isCritical: true },
+    ];
+  }
+
+  if (activeSabotage.type === 'o2') {
+    return [
+      { name: 'O2 Raum', x: 1520, y: 620, label: 'O2 RAUM', isCritical: true },
+      { name: 'Admin Raum', x: 1590, y: 820, label: 'ADMIN O2', isCritical: true },
+    ];
+  }
+
+  if (activeSabotage.type === 'lights') {
+    return [
+      { name: 'Elektrik', x: 760, y: 1080, label: 'LICHTER REPARIEREN', isCritical: false },
+    ];
+  }
+
+  if (activeSabotage.type === 'comms') {
+    return [
+      { name: 'Funkraum', x: 1450, y: 1350, label: 'FUNK REPARIEREN', isCritical: false },
+    ];
+  }
+
+  return [];
+}
+
+function drawSabotageBeacons(
+  ctx: CanvasRenderingContext2D,
+  activeSabotage: ActiveSabotage | null | undefined,
+  time: number
+) {
+  const targets = getSabotageTargets(activeSabotage);
+  for (const tgt of targets) {
+    ctx.save();
+    const pulse = (time / 600) % 1;
+    const radius = 10 + pulse * 45;
+    const alpha = (1 - pulse) * 0.85;
+
+    ctx.strokeStyle = tgt.isCritical ? `rgba(239, 68, 68, ${alpha})` : `rgba(245, 158, 11, ${alpha})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(tgt.x, tgt.y, radius, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.fillStyle = tgt.isCritical ? '#ef4444' : '#f59e0b';
+    ctx.beginPath(); ctx.arc(tgt.x, tgt.y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawSabotageDirectionalArrows(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,
   canvasHeight: number,
   localPlayer: Player,
-  activeSabotage?: ActiveSabotage | null,
-  time = 0
+  activeSabotage: ActiveSabotage | null | undefined,
+  time: number
 ) {
-  if (!activeSabotage || !localPlayer.isAlive) return;
   const targets = getSabotageTargets(activeSabotage);
   if (targets.length === 0) return;
 
-  const isCritical = activeSabotage.type === 'o2' || activeSabotage.type === 'reactor';
-  const pulse = (Math.sin(time / 140) + 1) * 0.5;
+  const screenCenterX = canvasWidth / 2;
+  const screenCenterY = canvasHeight / 2;
 
-  const cx = canvasWidth / 2;
-  const cy = canvasHeight / 2;
-  const marginX = 75;
-  const marginY = 75;
-  const maxDx = canvasWidth / 2 - marginX;
-  const maxDy = canvasHeight / 2 - marginY;
-
-  ctx.save();
-
-  for (const t of targets) {
-    const dx = t.x - localPlayer.x;
-    const dy = t.y - localPlayer.y;
+  for (const tgt of targets) {
+    const dx = tgt.x - localPlayer.x;
+    const dy = tgt.y - localPlayer.y;
     const dist = Math.hypot(dx, dy);
 
-    // If player is already within 75px of console, no arrow needed (beacon is clearly visible)
-    if (dist < 75) continue;
+    if (dist < 150) continue;
 
     const angle = Math.atan2(dy, dx);
+    const arrowMargin = 60;
+    const arrowDist = Math.min(canvasWidth / 2 - arrowMargin, canvasHeight / 2 - arrowMargin, 260);
 
-    // Calculate clamped screen edge coordinates along the direction ray
-    const cosA = Math.cos(angle);
-    const sinA = Math.sin(angle);
+    const arrowX = screenCenterX + Math.cos(angle) * arrowDist;
+    const arrowY = screenCenterY + Math.sin(angle) * arrowDist;
 
-    const scaleX = cosA !== 0 ? maxDx / Math.abs(cosA) : Infinity;
-    const scaleY = sinA !== 0 ? maxDy / Math.abs(sinA) : Infinity;
-    const edgeDist = Math.min(scaleX, scaleY);
-
-    // Check if target is inside screen bounds
-    let indicatorX: number;
-    let indicatorY: number;
-
-    if (Math.abs(dx) <= maxDx && Math.abs(dy) <= maxDy) {
-      indicatorX = cx + dx;
-      indicatorY = cy + dy;
-    } else {
-      indicatorX = cx + cosA * edgeDist;
-      indicatorY = cy + sinA * edgeDist;
-    }
-
-    // Draw pulsating Directional Chevron Arrow
     ctx.save();
-    ctx.translate(indicatorX, indicatorY);
-
-    const arrowScale = 1 + 0.12 * pulse;
-    ctx.scale(arrowScale, arrowScale);
+    ctx.translate(arrowX, arrowY);
     ctx.rotate(angle);
 
-    ctx.shadowColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.85)';
-    ctx.shadowBlur = 14 + pulse * 6;
-
-    // Chevron Arrow Path
+    ctx.fillStyle = tgt.isCritical ? '#ef4444' : '#f59e0b';
     ctx.beginPath();
-    ctx.moveTo(18, 0); // Tip
-    ctx.lineTo(-12, -15); // Top back corner
-    ctx.lineTo(-6, 0); // Inner back indent
-    ctx.lineTo(-12, 15); // Bottom back corner
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-10, -10);
+    ctx.lineTo(-4, 0);
+    ctx.lineTo(-10, 10);
     ctx.closePath();
-
-    ctx.fillStyle = isCritical ? '#ef4444' : '#fbbf24';
     ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
     ctx.stroke();
-
-    ctx.restore();
-
-    // Draw Informational Room & Distance Tag
-    ctx.save();
-    ctx.shadowBlur = 0;
-    const distanceMeters = Math.max(1, Math.round(dist / 24));
-    const labelText = `${t.name} (${distanceMeters}m)`;
-
-    ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
-    const textMetrics = ctx.measureText(labelText);
-    const tagW = textMetrics.width + 20;
-    const tagH = 22;
-
-    let tagX = indicatorX - tagW / 2;
-    let tagY = indicatorY + 22;
-
-    // Clamp tag inside canvas
-    tagX = Math.max(10, Math.min(canvasWidth - tagW - 10, tagX));
-    tagY = Math.max(30, Math.min(canvasHeight - tagH - 10, tagY));
-
-    // Tag background
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-    ctx.beginPath();
-    ctx.roundRect(tagX, tagY, tagW, tagH, 6);
-    ctx.fill();
-
-    ctx.strokeStyle = isCritical ? '#ef4444' : '#f59e0b';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Flashing warning icon dot
-    ctx.fillStyle = isCritical ? '#ef4444' : '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(tagX + 10, tagY + tagH / 2, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Tag text
-    ctx.fillStyle = '#f8fafc';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(labelText, tagX + 18, tagY + tagH / 2 + 1);
 
     ctx.restore();
   }
-
-  ctx.restore();
 }

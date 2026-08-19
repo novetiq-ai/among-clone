@@ -30,319 +30,350 @@ export interface WallBox {
 export const MAP_WIDTH = 2400;
 export const MAP_HEIGHT = 1600;
 
-export const SPAWN_POSITION = { x: 1200, y: 540 };
-export const EMERGENCY_BUTTON_POS = { x: 1200, y: 640, radius: 48 };
+export const SPAWN_POSITION = { x: 1200, y: 480 };
+export const EMERGENCY_BUTTON_POS = { x: 1200, y: 500, radius: 48 };
 
 // Designated safe spawn slots around the Cafeteria meeting table (away from collision bounds)
 export const SPAWN_SLOTS = [
-  { x: 1200, y: 510 }, // Top
-  { x: 1040, y: 550 }, // Top-Left
-  { x: 1360, y: 550 }, // Top-Right
-  { x: 980, y: 640 },  // Left
-  { x: 1420, y: 640 }, // Right
-  { x: 1040, y: 750 }, // Bottom-Left
-  { x: 1360, y: 750 }, // Bottom-Right
-  { x: 1200, y: 790 }, // Bottom
-  { x: 1120, y: 500 },
-  { x: 1280, y: 500 },
-  { x: 1120, y: 790 },
-  { x: 1280, y: 790 },
+  { x: 1200, y: 410 }, // Top
+  { x: 1100, y: 440 }, // Top-Left
+  { x: 1300, y: 440 }, // Top-Right
+  { x: 1040, y: 500 }, // Left
+  { x: 1360, y: 500 }, // Right
+  { x: 1100, y: 580 }, // Bottom-Left
+  { x: 1300, y: 580 }, // Bottom-Right
+  { x: 1200, y: 620 }, // Bottom
+  { x: 1150, y: 410 },
+  { x: 1250, y: 410 },
+  { x: 1150, y: 620 },
+  { x: 1250, y: 620 },
 ];
 
 export function getSpawnPosition(index: number) {
   return SPAWN_SLOTS[index % SPAWN_SLOTS.length] || SPAWN_POSITION;
 }
 
-// 14 Skeld Rooms with Exact Bounds (Airtight, Non-Overlapping)
+// 14 Skeld Rooms matching the authentic Among Us blueprint
 export const ROOMS: RoomArea[] = [
-  { id: 'cafeteria', name: 'Cafeteria', x: 920, y: 420, width: 560, height: 440, color: '#1e293b' },
-  { id: 'weapons', name: 'Weapons', x: 1600, y: 340, width: 380, height: 300, color: '#1e293b' },
-  { id: 'o2', name: 'O2', x: 1540, y: 680, width: 280, height: 200, color: '#1e293b' },
-  { id: 'navigation', name: 'Navigation', x: 1980, y: 660, width: 380, height: 380, color: '#1e293b' },
-  { id: 'shields', name: 'Shields', x: 1620, y: 1180, width: 360, height: 280, color: '#1e293b' },
-  { id: 'communications', name: 'Communications', x: 1300, y: 1240, width: 260, height: 220, color: '#1e293b' },
-  { id: 'storage', name: 'Storage', x: 920, y: 1020, width: 360, height: 440, color: '#1e293b' },
-  { id: 'admin', name: 'Admin', x: 1500, y: 920, width: 320, height: 220, color: '#1e293b' },
-  { id: 'electrical', name: 'Electrical', x: 620, y: 920, width: 300, height: 340, color: '#1e293b' },
-  { id: 'lower_engine', name: 'Lower Engine', x: 260, y: 1080, width: 340, height: 340, color: '#1e293b' },
-  { id: 'security', name: 'Security', x: 620, y: 640, width: 280, height: 240, color: '#1e293b' },
-  { id: 'reactor', name: 'Reactor', x: 80, y: 620, width: 340, height: 440, color: '#1e293b' },
-  { id: 'upper_engine', name: 'Upper Engine', x: 260, y: 340, width: 340, height: 280, color: '#1e293b' },
-  { id: 'medbay', name: 'MedBay', x: 620, y: 360, width: 300, height: 260, color: '#1e293b' },
+  // 1. Cafeteria (Large Center-Top room)
+  { id: 'cafeteria', name: 'Cafeteria', x: 960, y: 280, width: 480, height: 440, color: '#263040' },
+  // 2. Weapons (Top-Right room)
+  { id: 'weapons', name: 'Weapons', x: 1560, y: 280, width: 280, height: 280, color: '#2a3545' },
+  // 3. O2 (Right-Center room)
+  { id: 'o2', name: 'O2', x: 1460, y: 580, width: 200, height: 180, color: '#1e3328' },
+  // 4. Navigation (Far Right Cockpit)
+  { id: 'navigation', name: 'Navigation', x: 1960, y: 620, width: 340, height: 320, color: '#1a2842' },
+  // 5. Shields (Bottom-Right room)
+  { id: 'shields', name: 'Shields', x: 1620, y: 1040, width: 300, height: 260, color: '#1e2d3d' },
+  // 6. Communications (Bottom-Center room)
+  { id: 'communications', name: 'Communications', x: 1280, y: 1240, width: 240, height: 180, color: '#252d38' },
+  // 7. Storage (Large Bottom-Center room)
+  { id: 'storage', name: 'Storage', x: 920, y: 960, width: 380, height: 380, color: '#2a3040' },
+  // 8. Admin (Right of Central Hallway, below Cafeteria)
+  { id: 'admin', name: 'Admin', x: 1340, y: 780, width: 300, height: 220, color: '#242c38' },
+  // 9. Electrical (Below Security, left of Storage)
+  { id: 'electrical', name: 'Electrical', x: 640, y: 920, width: 240, height: 220, color: '#181c24' },
+  // 10. Lower Engine (Bottom-Left Engine Pod)
+  { id: 'lower_engine', name: 'Lower Engine', x: 240, y: 1040, width: 320, height: 280, color: '#222c3a' },
+  // 11. Security (Right of West Cross, above Electrical)
+  { id: 'security', name: 'Security', x: 580, y: 720, width: 200, height: 200, color: '#1c2630' },
+  // 12. Reactor (Far-Left Core Room)
+  { id: 'reactor', name: 'Reactor', x: 60, y: 640, width: 220, height: 360, color: '#281a1e' },
+  // 13. Upper Engine (Top-Left Engine Pod)
+  { id: 'upper_engine', name: 'Upper Engine', x: 240, y: 320, width: 320, height: 280, color: '#222c3a' },
+  // 14. MedBay (Below Upper Hallway, above Security)
+  { id: 'medbay', name: 'MedBay', x: 680, y: 500, width: 260, height: 260, color: '#1a2a26' },
 ];
 
 // Hallways seamlessly connecting all rooms
 export const CORRIDORS: CorridorArea[] = [
-  // Cafeteria <-> MedBay (NW Hallway)
-  { id: 'corr-caf-med', name: 'Flur (Cafeteria ➔ MedBay)', x: 900, y: 460, width: 40, height: 140 },
-  { id: 'corr-med-upper', name: 'Flur (MedBay ➔ Upper Engine)', x: 580, y: 440, width: 60, height: 140 },
-  // West Corridor (MedBay <-> Security <-> Electrical)
-  { id: 'corr-med-sec', name: 'Flur (MedBay ➔ Security)', x: 680, y: 600, width: 160, height: 60 },
-  { id: 'corr-sec-elec', name: 'Flur (Security ➔ Electrical)', x: 680, y: 860, width: 160, height: 80 },
-  // Reactor Hallways
-  { id: 'corr-react-upper', name: 'Flur (Reactor ➔ Upper Engine)', x: 200, y: 560, width: 140, height: 100 },
-  { id: 'corr-react-lower', name: 'Flur (Reactor ➔ Lower Engine)', x: 200, y: 1020, width: 140, height: 100 },
-  { id: 'corr-react-sec', name: 'Flur (Reactor ➔ Security)', x: 400, y: 720, width: 240, height: 120 },
-  // Electrical <-> Lower Engine & Storage
-  { id: 'corr-elec-lower', name: 'Flur (Electrical ➔ Lower Engine)', x: 560, y: 1140, width: 80, height: 120 },
-  { id: 'corr-elec-stor', name: 'Flur (Electrical ➔ Storage)', x: 880, y: 1120, width: 40, height: 140 },
-  // Central Hallway (Cafeteria <-> Storage)
-  { id: 'corr-center-main', name: 'Zentralflur (Cafeteria ➔ Storage)', x: 1080, y: 840, width: 200, height: 200 },
-  // Storage <-> Admin & Comms
-  { id: 'corr-stor-admin', name: 'Flur (Storage ➔ Admin)', x: 1260, y: 960, width: 260, height: 120 },
-  { id: 'corr-stor-comms', name: 'Flur (Storage ➔ Comms)', x: 1260, y: 1280, width: 60, height: 120 },
-  // Cafeteria <-> Weapons (NE Hallway)
-  { id: 'corr-caf-weap', name: 'Flur (Cafeteria ➔ Weapons)', x: 1460, y: 460, width: 160, height: 140 },
-  // Weapons <-> O2 <-> Navigation
-  { id: 'corr-weap-nav', name: 'Flur (Weapons ➔ Navigation)', x: 1720, y: 620, width: 280, height: 140 },
-  // O2 <-> Navigation
-  { id: 'corr-o2-nav', name: 'Flur (O2 ➔ Navigation)', x: 1800, y: 740, width: 200, height: 120 },
-  // Navigation <-> Shields
-  { id: 'corr-nav-shield', name: 'Flur (Navigation ➔ Shields)', x: 1800, y: 1020, width: 200, height: 180 },
-  // Shields <-> Comms
-  { id: 'corr-shield-comms', name: 'Flur (Shields ➔ Comms)', x: 1540, y: 1280, width: 100, height: 120 },
-  // Admin <-> Shields/Hallway
-  { id: 'corr-admin-hall', name: 'Flur (Admin ➔ Shields)', x: 1620, y: 1120, width: 140, height: 80 },
+  // 1. Upper Hallway (Upper Engine ➔ MedBay ➔ Cafeteria)
+  { id: 'corr-upper-hall', name: 'Oberer Flur (Upper Engine ➔ Cafeteria)', x: 540, y: 400, width: 440, height: 100 },
+  // 2. West Cross - Vertical (Upper Engine ➔ Lower Engine)
+  { id: 'corr-west-cross-vert', name: 'Reaktor-Kreuzung (Nord-Süd)', x: 350, y: 580, width: 100, height: 480 },
+  // 3. West Cross - Horizontal (Reactor ➔ Security)
+  { id: 'corr-west-cross-horiz', name: 'Reaktor-Kreuzung (Ost-West)', x: 260, y: 760, width: 340, height: 100 },
+  // 4. Lower Hallway (Lower Engine ➔ Electrical ➔ Storage)
+  { id: 'corr-lower-hall', name: 'Unterer Flur (Lower Engine ➔ Storage)', x: 540, y: 1200, width: 400, height: 100 },
+  // 5. Electrical Entrance (from Lower Hallway into Electrical)
+  { id: 'corr-elec-entry', name: 'Elektrik Eingang', x: 710, y: 1120, width: 100, height: 100 },
+  // 6. Central Hallway (Cafeteria ➔ Storage)
+  { id: 'corr-center-main', name: 'Zentralflur (Cafeteria ➔ Storage)', x: 1150, y: 700, width: 100, height: 280 },
+  // 7. Admin Entrance Branch (from Central Hallway into Admin)
+  { id: 'corr-admin-branch', name: 'Admin Eingang', x: 1230, y: 830, width: 130, height: 100 },
+  // 8. Cafeteria to Weapons (NE Hallway)
+  { id: 'corr-caf-weap', name: 'Flur (Cafeteria ➔ Weapons)', x: 1420, y: 370, width: 160, height: 100 },
+  // 9. East Hallway Hub - Vertical (Weapons ➔ O2 ➔ Shields)
+  { id: 'corr-east-hub-vert', name: 'Östlicher Flur (Weapons ➔ Shields)', x: 1640, y: 540, width: 100, height: 520 },
+  // 10. East Hallway to Navigation (Top entrance)
+  { id: 'corr-east-nav-top', name: 'Flur (O2 ➔ Navigation)', x: 1720, y: 660, width: 260, height: 100 },
+  // 11. Navigation to Shields (Bottom entrance)
+  { id: 'corr-nav-shield', name: 'Flur (Navigation ➔ Shields)', x: 1840, y: 880, width: 180, height: 180 },
+  // 12. Storage to Shields & Comms Hallway
+  { id: 'corr-stor-shields', name: 'Flur (Storage ➔ Shields)', x: 1280, y: 1100, width: 360, height: 100 },
+  // 13. Communications Entrance Branch
+  { id: 'corr-comms-branch', name: 'Funkraum Eingang', x: 1350, y: 1180, width: 100, height: 80 },
 ];
 
-// Complete Tasks Definitions (28 Authentic Tasks across all rooms)
+// Complete Tasks Definitions (Authentic Tasks across all rooms)
 export const ALL_TASKS: TaskDefinition[] = [
   // Admin
-  { id: 'task-admin-card', type: 'swipe_card', name: 'Karte durchziehen', room: 'Admin', x: 1700, y: 960 },
-  { id: 'task-wires-admin', type: 'wires', name: 'Drähte verbinden', room: 'Admin', x: 1540, y: 1040 },
+  { id: 'task-admin-card', type: 'swipe_card', name: 'Karte durchziehen', room: 'Admin', x: 1590, y: 820 },
+  { id: 'task-wires-admin', type: 'wires', name: 'Drähte verbinden', room: 'Admin', x: 1380, y: 950 },
 
   // Cafeteria
-  { id: 'task-cafeteria-garbage', type: 'empty_garbage', name: 'Müll entsorgen', room: 'Cafeteria', x: 1420, y: 450 },
-  { id: 'task-cafeteria-download', type: 'download_data', name: 'Daten herunterladen', room: 'Cafeteria', x: 980, y: 450 },
-  { id: 'task-wires-cafeteria', type: 'wires', name: 'Drähte verbinden', room: 'Cafeteria', x: 1420, y: 800 },
+  { id: 'task-cafeteria-garbage', type: 'empty_garbage', name: 'Müll entsorgen', room: 'Cafeteria', x: 1380, y: 330 },
+  { id: 'task-cafeteria-download', type: 'download_data', name: 'Daten herunterladen', room: 'Cafeteria', x: 1090, y: 330 },
+  { id: 'task-wires-cafeteria', type: 'wires', name: 'Drähte verbinden', room: 'Cafeteria', x: 1000, y: 330 },
 
   // Shields
-  { id: 'task-shields-prime', type: 'prime_shields', name: 'Schilde aktivieren', room: 'Shields', x: 1840, y: 1240 },
-  { id: 'task-shields-divert', type: 'divert_power', name: 'Energie umleiten', room: 'Shields', x: 1680, y: 1380 },
+  { id: 'task-shields-prime', type: 'prime_shields', name: 'Schilde aktivieren', room: 'Shields', x: 1770, y: 1170 },
+  { id: 'task-shields-divert', type: 'divert_power', name: 'Energie umleiten', room: 'Shields', x: 1670, y: 1240 },
 
   // Weapons
-  { id: 'task-weapons-asteroids', type: 'clear_asteroids', name: 'Asteroiden abschießen', room: 'Weapons', x: 1860, y: 400 },
-  { id: 'task-weapons-download', type: 'download_data', name: 'Daten herunterladen', room: 'Weapons', x: 1680, y: 580 },
+  { id: 'task-weapons-asteroids', type: 'clear_asteroids', name: 'Asteroiden abschießen', room: 'Weapons', x: 1770, y: 330 },
+  { id: 'task-weapons-download', type: 'download_data', name: 'Daten herunterladen', room: 'Weapons', x: 1630, y: 500 },
 
   // Electrical
-  { id: 'task-calibrate-distributor', type: 'calibrate_distributor', name: 'Verteiler kalibrieren', room: 'Electrical', x: 840, y: 980 },
-  { id: 'task-wires-electrical', type: 'wires', name: 'Drähte verbinden', room: 'Electrical', x: 670, y: 960 },
-  { id: 'task-electrical-power', type: 'divert_power', name: 'Energie umleiten', room: 'Electrical', x: 740, y: 1200 },
+  { id: 'task-calibrate-distributor', type: 'calibrate_distributor', name: 'Verteiler kalibrieren', room: 'Electrical', x: 820, y: 960 },
+  { id: 'task-wires-electrical', type: 'wires', name: 'Drähte verbinden', room: 'Electrical', x: 680, y: 960 },
+  { id: 'task-electrical-power', type: 'divert_power', name: 'Energie umleiten', room: 'Electrical', x: 760, y: 1080 },
 
   // O2
-  { id: 'task-o2-filter', type: 'clean_o2_filter', name: 'O2 Filter reinigen', room: 'O2', x: 1740, y: 740 },
-  { id: 'task-o2-garbage', type: 'empty_garbage', name: 'Müllschacht leeren', room: 'O2', x: 1740, y: 840 },
+  { id: 'task-o2-filter', type: 'clean_o2_filter', name: 'O2 Filter reinigen', room: 'O2', x: 1520, y: 620 },
+  { id: 'task-o2-garbage', type: 'empty_garbage', name: 'Müllschacht leeren', room: 'O2', x: 1610, y: 700 },
 
   // Navigation
-  { id: 'task-chart-course', type: 'chart_course', name: 'Kurs festlegen', room: 'Navigation', x: 2260, y: 760 },
-  { id: 'task-nav-download', type: 'download_data', name: 'Daten übertragen', room: 'Navigation', x: 2060, y: 960 },
+  { id: 'task-chart-course', type: 'chart_course', name: 'Kurs festlegen', room: 'Navigation', x: 2240, y: 780 },
+  { id: 'task-nav-download', type: 'download_data', name: 'Daten übertragen', room: 'Navigation', x: 2060, y: 880 },
 
   // Reactor
-  { id: 'task-start-reactor', type: 'start_reactor', name: 'Reaktor starten (Simon Says)', room: 'Reactor', x: 140, y: 720 },
-  { id: 'task-reactor-manifolds', type: 'manifolds', name: 'Manifolds entsperren (1-10)', room: 'Reactor', x: 140, y: 940 },
+  { id: 'task-start-reactor', type: 'start_reactor', name: 'Reaktor starten (Simon Says)', room: 'Reactor', x: 100, y: 720 },
+  { id: 'task-reactor-manifolds', type: 'manifolds', name: 'Manifolds entsperren (1-10)', room: 'Reactor', x: 100, y: 920 },
 
   // MedBay
-  { id: 'task-medbay-scan', type: 'medbay_scan', name: 'MedBay Körperscan', room: 'MedBay', x: 860, y: 500 },
-  { id: 'task-medbay-inspect', type: 'inspect_sample', name: 'Proben analysieren', room: 'MedBay', x: 680, y: 540 },
+  { id: 'task-medbay-scan', type: 'medbay_scan', name: 'MedBay Körperscan', room: 'MedBay', x: 840, y: 680 },
+  { id: 'task-medbay-inspect', type: 'inspect_sample', name: 'Proben analysieren', room: 'MedBay', x: 720, y: 620 },
 
   // Upper Engine
-  { id: 'task-upper-engine-align', type: 'align_engine', name: 'Triebwerk ausrichten', room: 'Upper Engine', x: 380, y: 400 },
-  { id: 'task-upper-engine-refuel', type: 'refuel_engines', name: 'Triebwerk betanken', room: 'Upper Engine', x: 320, y: 580 },
+  { id: 'task-upper-engine-align', type: 'align_engine', name: 'Triebwerk ausrichten', room: 'Upper Engine', x: 360, y: 380 },
+  { id: 'task-upper-engine-refuel', type: 'refuel_engines', name: 'Triebwerk betanken', room: 'Upper Engine', x: 290, y: 530 },
 
   // Lower Engine
-  { id: 'task-lower-engine-align', type: 'align_engine', name: 'Triebwerk ausrichten', room: 'Lower Engine', x: 380, y: 1360 },
-  { id: 'task-lower-engine-refuel', type: 'refuel_engines', name: 'Triebwerk betanken', room: 'Lower Engine', x: 320, y: 1140 },
+  { id: 'task-lower-engine-align', type: 'align_engine', name: 'Triebwerk ausrichten', room: 'Lower Engine', x: 360, y: 1250 },
+  { id: 'task-lower-engine-refuel', type: 'refuel_engines', name: 'Triebwerk betanken', room: 'Lower Engine', x: 290, y: 1100 },
 
   // Storage
-  { id: 'task-storage-refuel', type: 'refuel_engines', name: 'Kanister auftanken', room: 'Storage', x: 1180, y: 1380 },
-  { id: 'task-storage-garbage', type: 'empty_garbage', name: 'Müllpresse leeren', room: 'Storage', x: 1220, y: 1400 },
-  { id: 'task-wires-storage', type: 'wires', name: 'Drähte verbinden', room: 'Storage', x: 1040, y: 1060 },
+  { id: 'task-storage-refuel', type: 'refuel_engines', name: 'Kanister auftanken', room: 'Storage', x: 1220, y: 1270 },
+  { id: 'task-storage-garbage', type: 'empty_garbage', name: 'Müllpresse leeren', room: 'Storage', x: 1120, y: 1290 },
+  { id: 'task-wires-storage', type: 'wires', name: 'Drähte verbinden', room: 'Storage', x: 970, y: 1020 },
 
   // Communications
-  { id: 'task-comms-download', type: 'download_data', name: 'Daten herunterladen', room: 'Communications', x: 1480, y: 1380 },
+  { id: 'task-comms-download', type: 'download_data', name: 'Daten herunterladen', room: 'Communications', x: 1450, y: 1350 },
 ];
 
-// Impostor Vents: Authentic 14-Vent Skeld Network
+// Impostor Vents: Authentic 14-Vent Skeld Network from reference diagram
 export const VENTS: VentDefinition[] = [
   // Triangle 1: MedBay <-> Security <-> Electrical
-  { id: 'vent-medbay', room: 'MedBay', x: 680, y: 420, connectedVents: ['vent-security', 'vent-electrical'] },
-  { id: 'vent-security', room: 'Security', x: 680, y: 820, connectedVents: ['vent-medbay', 'vent-electrical'] },
-  { id: 'vent-electrical', room: 'Electrical', x: 670, y: 970, connectedVents: ['vent-medbay', 'vent-security'] },
+  { id: 'vent-medbay', room: 'MedBay', x: 720, y: 710, connectedVents: ['vent-security', 'vent-electrical'] },
+  { id: 'vent-security', room: 'Security', x: 630, y: 870, connectedVents: ['vent-medbay', 'vent-electrical'] },
+  { id: 'vent-electrical', room: 'Electrical', x: 680, y: 970, connectedVents: ['vent-medbay', 'vent-security'] },
 
-  // Triangle 2: Cafeteria (Top-Right) <-> Admin <-> Hallway
-  { id: 'vent-cafeteria', room: 'Cafeteria', x: 1420, y: 480, connectedVents: ['vent-admin', 'vent-hallway-admin'] },
-  { id: 'vent-admin', room: 'Admin', x: 1760, y: 1040, connectedVents: ['vent-cafeteria', 'vent-hallway-admin'] },
-  { id: 'vent-hallway-admin', room: 'Flur (Admin/Shields)', x: 1680, y: 1150, connectedVents: ['vent-cafeteria', 'vent-admin'] },
+  // Triangle 2: Cafeteria (Top-Right) <-> Admin <-> Hallway (Outside Shields)
+  { id: 'vent-cafeteria', room: 'Cafeteria', x: 1380, y: 360, connectedVents: ['vent-admin', 'vent-hallway-shields'] },
+  { id: 'vent-admin', room: 'Admin', x: 1380, y: 950, connectedVents: ['vent-cafeteria', 'vent-hallway-shields'] },
+  { id: 'vent-hallway-shields', room: 'Flur (O2/Shields)', x: 1720, y: 680, connectedVents: ['vent-cafeteria', 'vent-admin'] },
 
   // Pair 3: Reactor Top <-> Upper Engine
-  { id: 'vent-reactor-top', room: 'Reactor (Oben)', x: 140, y: 670, connectedVents: ['vent-upper-engine'] },
-  { id: 'vent-upper-engine', room: 'Upper Engine', x: 320, y: 400, connectedVents: ['vent-reactor-top'] },
+  { id: 'vent-reactor-top', room: 'Reactor (Oben)', x: 110, y: 690, connectedVents: ['vent-upper-engine'] },
+  { id: 'vent-upper-engine', room: 'Upper Engine', x: 290, y: 370, connectedVents: ['vent-reactor-top'] },
 
   // Pair 4: Reactor Bottom <-> Lower Engine
-  { id: 'vent-reactor-bottom', room: 'Reactor (Unten)', x: 140, y: 1010, connectedVents: ['vent-lower-engine'] },
-  { id: 'vent-lower-engine', room: 'Lower Engine', x: 320, y: 1360, connectedVents: ['vent-reactor-bottom'] },
+  { id: 'vent-reactor-bottom', room: 'Reactor (Unten)', x: 110, y: 950, connectedVents: ['vent-lower-engine'] },
+  { id: 'vent-lower-engine', room: 'Lower Engine', x: 290, y: 1270, connectedVents: ['vent-reactor-bottom'] },
 
   // Pair 5: Weapons <-> Navigation Top
-  { id: 'vent-weapons', room: 'Weapons', x: 1880, y: 400, connectedVents: ['vent-nav-top'] },
-  { id: 'vent-nav-top', room: 'Navigation (Oben)', x: 2280, y: 710, connectedVents: ['vent-weapons'] },
+  { id: 'vent-weapons', room: 'Weapons', x: 1780, y: 340, connectedVents: ['vent-nav-top'] },
+  { id: 'vent-nav-top', room: 'Navigation (Oben)', x: 2240, y: 670, connectedVents: ['vent-weapons'] },
 
   // Pair 6: Shields <-> Navigation Bottom
-  { id: 'vent-shields', room: 'Shields', x: 1900, y: 1380, connectedVents: ['vent-nav-bottom'] },
-  { id: 'vent-nav-bottom', room: 'Navigation (Unten)', x: 2280, y: 990, connectedVents: ['vent-shields'] },
+  { id: 'vent-shields', room: 'Shields', x: 1860, y: 1240, connectedVents: ['vent-nav-bottom'] },
+  { id: 'vent-nav-bottom', room: 'Navigation (Unten)', x: 2240, y: 890, connectedVents: ['vent-shields'] },
 ];
 
 // CCTV Security Camera Positions (Physical props mounted on corridor bulkheads)
 export const SECURITY_CAMERAS = [
-  { id: 'cam-medbay', name: 'MedBay Flur', x: 900, y: 450, facing: 'right' },
-  { id: 'cam-admin', name: 'Admin Flur', x: 1420, y: 960, facing: 'left' },
-  { id: 'cam-nav', name: 'Navigation Flur', x: 1940, y: 760, facing: 'left' },
-  { id: 'cam-reactor', name: 'Reaktor Flur', x: 440, y: 780, facing: 'right' },
+  { id: 'cam-medbay', name: 'MedBay Flur', x: 900, y: 420, facing: 'right' },
+  { id: 'cam-admin', name: 'Admin Flur', x: 1190, y: 860, facing: 'left' },
+  { id: 'cam-nav', name: 'Navigation Flur', x: 1740, y: 740, facing: 'left' },
+  { id: 'cam-reactor', name: 'Reaktor Flur', x: 450, y: 800, facing: 'right' },
 ];
 
 // ============================================================================
 // EXHAUSTIVE, AIRTIGHT COLLISION GEOMETRY
-// Thick, solid wall boundaries and interior furniture hitboxes.
 // Zero gaps into outer space. Zero tunneling.
 // ============================================================================
 export const WALLS: WallBox[] = [
   // ----------------------------------------------------
   // OUTER SHIP HULL BOUNDARIES (Space Vacuum Barriers)
   // ----------------------------------------------------
-  { x: 0, y: 0, width: MAP_WIDTH, height: 320 }, // North space void
-  { x: 0, y: 1480, width: MAP_WIDTH, height: 120 }, // South space void
-  { x: 0, y: 0, width: 60, height: MAP_HEIGHT }, // Far West space void
-  { x: 2380, y: 0, width: 40, height: MAP_HEIGHT }, // Far East space void
+  { x: 0, y: 0, width: MAP_WIDTH, height: 260 }, // North space void
+  { x: 0, y: 1440, width: MAP_WIDTH, height: 160 }, // South space void
+  { x: 0, y: 0, width: 40, height: MAP_HEIGHT }, // Far West space void
+  { x: 2320, y: 0, width: 80, height: MAP_HEIGHT }, // Far East space void
 
   // Outer Engine Pod Hull Cutouts
-  { x: 0, y: 320, width: 240, height: 260 }, // Upper left void
-  { x: 0, y: 1120, width: 220, height: 360 }, // Lower left void (clear of corr-react-lower)
+  { x: 0, y: 260, width: 220, height: 360 }, // Upper left void
+  { x: 0, y: 1020, width: 220, height: 440 }, // Lower left void
 
   // ----------------------------------------------------
-  // 1. CAFETERIA WALLS
+  // 1. CAFETERIA WALLS (x: 960..1440, y: 280..720)
   // ----------------------------------------------------
-  { x: 920, y: 380, width: 560, height: 40 }, // North Wall
-  { x: 880, y: 580, width: 40, height: 280 }, // West Wall (opening at y: 460..580)
-  { x: 1480, y: 580, width: 40, height: 280 }, // East Wall (opening at y: 460..580)
-  { x: 920, y: 860, width: 160, height: 40 }, // South Wall Left Wing
-  { x: 1280, y: 860, width: 200, height: 40 }, // South Wall Right Wing (opening x: 1080..1280)
+  { x: 960, y: 250, width: 480, height: 40 }, // North Wall
+  { x: 930, y: 280, width: 40, height: 130 }, // West Wall Top
+  { x: 930, y: 490, width: 40, height: 230 }, // West Wall Bottom (opening y: 410..490 to Upper Hallway)
+  { x: 1430, y: 280, width: 40, height: 100 }, // East Wall Top
+  { x: 1430, y: 460, width: 40, height: 260 }, // East Wall Bottom (opening y: 380..460 to Weapons)
+  { x: 960, y: 710, width: 200, height: 40 }, // South Wall Left
+  { x: 1240, y: 710, width: 200, height: 40 }, // South Wall Right (opening x: 1160..1240 to Central Hallway)
 
   // ----------------------------------------------------
-  // 2. WEAPONS WALLS
+  // 2. UPPER HALLWAY WALLS (x: 540..980, y: 400..500)
   // ----------------------------------------------------
-  { x: 1600, y: 300, width: 380, height: 40 }, // North Wall
-  { x: 1560, y: 300, width: 40, height: 160 }, // West Wall Top
-  { x: 1560, y: 580, width: 40, height: 60 }, // West Wall Bottom (opening y: 460..580)
-  { x: 1980, y: 300, width: 40, height: 360 }, // East Outer Wall
-  { x: 1600, y: 640, width: 120, height: 40 }, // South Wall Left (opening x: 1720..1980)
+  { x: 540, y: 370, width: 440, height: 40 }, // North Wall
+  { x: 540, y: 490, width: 210, height: 40 }, // South Wall Left
+  { x: 830, y: 490, width: 150, height: 40 }, // South Wall Right (opening x: 750..830 down to MedBay)
 
   // ----------------------------------------------------
-  // 3. O2 WALLS
+  // 3. MEDBAY WALLS (x: 680..940, y: 500..760)
   // ----------------------------------------------------
-  { x: 1540, y: 640, width: 280, height: 40 }, // North Wall
-  { x: 1500, y: 640, width: 40, height: 240 }, // West Wall
-  { x: 1540, y: 880, width: 280, height: 40 }, // South Wall
-  { x: 1820, y: 640, width: 40, height: 100 }, // East Wall Top
-  { x: 1820, y: 860, width: 40, height: 60 }, // East Wall Bottom (opening y: 740..860)
+  { x: 650, y: 490, width: 100, height: 40 }, // North Wall Left
+  { x: 830, y: 490, width: 130, height: 40 }, // North Wall Right (opening x: 750..830 to Upper Hallway)
+  { x: 650, y: 500, width: 40, height: 270 }, // West Wall
+  { x: 680, y: 750, width: 260, height: 40 }, // South Wall
+  { x: 930, y: 500, width: 40, height: 270 }, // East Wall
 
   // ----------------------------------------------------
-  // 4. NAVIGATION WALLS (Pointy Cockpit Nose)
+  // 4. UPPER ENGINE WALLS (x: 240..560, y: 320..600)
   // ----------------------------------------------------
-  { x: 1980, y: 620, width: 380, height: 40 }, // North Wall
-  { x: 2360, y: 620, width: 40, height: 440 }, // Far East Cockpit Nose
-  { x: 1980, y: 1040, width: 380, height: 40 }, // South Wall
-  { x: 1940, y: 800, width: 40, height: 100 }, // West Wall Middle (openings y: 700..800 and y: 900..1000)
+  { x: 220, y: 290, width: 350, height: 40 }, // North Wall
+  { x: 210, y: 320, width: 40, height: 290 }, // West Wall
+  { x: 550, y: 320, width: 40, height: 90 }, // East Wall Top
+  { x: 550, y: 490, width: 40, height: 120 }, // East Wall Bottom (opening y: 410..490 to Upper Hallway)
+  { x: 240, y: 590, width: 120, height: 40 }, // South Wall Left
+  { x: 440, y: 590, width: 130, height: 40 }, // South Wall Right (opening x: 360..440 to West Cross)
 
   // ----------------------------------------------------
-  // 5. SHIELDS WALLS
+  // 5. WEST CROSS JUNCTION WALLS
   // ----------------------------------------------------
-  { x: 1760, y: 1140, width: 220, height: 40 }, // North Wall Right (openings x: 1620..1760 to Admin and x: 1800..1980 to Nav)
-  { x: 1980, y: 1140, width: 40, height: 340 }, // East Outer Wall
-  { x: 1620, y: 1460, width: 400, height: 40 }, // South Outer Wall
-  { x: 1580, y: 1140, width: 40, height: 140 }, // West Wall Top (opening y: 1280..1400)
-  { x: 1580, y: 1400, width: 40, height: 60 }, // West Wall Bottom
+  { x: 260, y: 620, width: 100, height: 150 }, // NW corner block
+  { x: 260, y: 850, width: 100, height: 200 }, // SW corner block
+  { x: 440, y: 620, width: 150, height: 150 }, // NE corner block
+  { x: 440, y: 850, width: 150, height: 200 }, // SE corner block
 
   // ----------------------------------------------------
-  // 6. COMMUNICATIONS WALLS
+  // 6. REACTOR WALLS (x: 60..280, y: 640..1000)
   // ----------------------------------------------------
-  { x: 1300, y: 1200, width: 260, height: 40 }, // North Wall
-  { x: 1300, y: 1460, width: 260, height: 40 }, // South Wall
-  { x: 1260, y: 1200, width: 40, height: 80 }, // West Wall Top (opening y: 1280..1400)
-  { x: 1260, y: 1400, width: 40, height: 60 }, // West Wall Bottom
+  { x: 40, y: 610, width: 240, height: 40 }, // North Wall
+  { x: 40, y: 640, width: 40, height: 370 }, // West Wall
+  { x: 40, y: 990, width: 240, height: 40 }, // South Wall
+  { x: 270, y: 640, width: 40, height: 130 }, // East Wall Top
+  { x: 270, y: 850, width: 40, height: 150 }, // East Wall Bottom (opening y: 770..850 to West Cross)
 
   // ----------------------------------------------------
-  // 7. STORAGE WALLS
+  // 7. SECURITY WALLS (x: 580..780, y: 720..920)
   // ----------------------------------------------------
-  { x: 900, y: 980, width: 180, height: 40 }, // North Wall Left Wing
-  { x: 1280, y: 980, width: 40, height: 40 }, // North Wall Right Wing (opening x: 1080..1280)
-  { x: 860, y: 980, width: 40, height: 140 }, // West Wall Top (opening y: 1120..1240)
-  { x: 860, y: 1240, width: 40, height: 240 }, // West Wall Bottom
-  { x: 900, y: 1460, width: 360, height: 40 }, // South Wall (opening x: 1260..1360 to comms)
-  { x: 1280, y: 1080, width: 40, height: 200 }, // East Wall (opening y: 960..1080 to admin)
+  { x: 570, y: 690, width: 230, height: 40 }, // North Wall
+  { x: 770, y: 720, width: 40, height: 210 }, // East Wall
+  { x: 570, y: 910, width: 230, height: 40 }, // South Wall
+  { x: 560, y: 720, width: 40, height: 60 }, // West Wall Top
+  { x: 560, y: 850, width: 40, height: 80 }, // West Wall Bottom (opening y: 780..850 to West Cross)
 
   // ----------------------------------------------------
-  // 8. ADMIN WALLS
+  // 8. LOWER ENGINE WALLS (x: 240..560, y: 1040..1320)
   // ----------------------------------------------------
-  { x: 1500, y: 880, width: 320, height: 40 }, // North Wall
-  { x: 1500, y: 1140, width: 120, height: 40 }, // South Wall Left (opening x: 1620..1760 to Shields)
-  { x: 1760, y: 1140, width: 60, height: 40 }, // South Wall Right
-  { x: 1820, y: 880, width: 40, height: 280 }, // East Wall
-  { x: 1460, y: 880, width: 40, height: 80 }, // West Wall Top
-  { x: 1460, y: 1080, width: 40, height: 80 }, // West Wall Bottom (opening y: 960..1080)
+  { x: 240, y: 1010, width: 120, height: 40 }, // North Wall Left
+  { x: 440, y: 1010, width: 130, height: 40 }, // North Wall Right (opening x: 360..440 to West Cross)
+  { x: 210, y: 1040, width: 40, height: 290 }, // West Wall
+  { x: 220, y: 1310, width: 350, height: 40 }, // South Wall
+  { x: 550, y: 1040, width: 40, height: 170 }, // East Wall Top
+  { x: 550, y: 1290, width: 40, height: 40 }, // East Wall Bottom (opening y: 1210..1290 to Lower Hallway)
 
   // ----------------------------------------------------
-  // 9. ELECTRICAL WALLS
+  // 9. LOWER HALLWAY & ELECTRICAL WALLS
   // ----------------------------------------------------
-  { x: 620, y: 880, width: 60, height: 40 }, // North Wall Left
-  { x: 840, y: 880, width: 80, height: 40 }, // North Wall Right (opening x: 680..840)
-  { x: 580, y: 880, width: 40, height: 260 }, // West Wall Top (opening y: 1140..1240)
-  { x: 620, y: 1260, width: 300, height: 40 }, // South Wall
-  { x: 920, y: 880, width: 40, height: 240 }, // East Wall Top (opening y: 1120..1240)
+  { x: 540, y: 1290, width: 400, height: 40 }, // Lower Hallway South Wall
+  { x: 550, y: 1170, width: 170, height: 40 }, // Lower Hallway North Wall Left
+  { x: 800, y: 1170, width: 140, height: 40 }, // Lower Hallway North Wall Right (opening x: 720..800 to Electrical)
+  { x: 620, y: 890, width: 280, height: 40 }, // Electrical North Wall
+  { x: 610, y: 920, width: 40, height: 270 }, // Electrical West Wall
+  { x: 870, y: 920, width: 40, height: 270 }, // Electrical East Wall
+  { x: 640, y: 1130, width: 80, height: 40 }, // Electrical South Wall Left
+  { x: 800, y: 1130, width: 90, height: 40 }, // Electrical South Wall Right (opening x: 720..800)
 
   // ----------------------------------------------------
-  // 10. SECURITY WALLS
+  // 10. STORAGE WALLS (x: 920..1300, y: 960..1340)
   // ----------------------------------------------------
-  { x: 620, y: 600, width: 60, height: 40 }, // North Wall Left
-  { x: 840, y: 600, width: 60, height: 40 }, // North Wall Right (opening x: 680..840)
-  { x: 900, y: 600, width: 40, height: 300 }, // East Wall
-  { x: 580, y: 600, width: 40, height: 120 }, // West Wall Top
-  { x: 580, y: 820, width: 40, height: 80 }, // West Wall Bottom (opening y: 720..820)
-  { x: 620, y: 880, width: 60, height: 40 }, // South Wall Left
-  { x: 840, y: 880, width: 60, height: 40 }, // South Wall Right (opening x: 680..840)
+  { x: 890, y: 960, width: 40, height: 250 }, // West Wall Top
+  { x: 890, y: 1290, width: 40, height: 60 }, // West Wall Bottom (opening y: 1210..1290 to Lower Hallway)
+  { x: 920, y: 930, width: 240, height: 40 }, // North Wall Left
+  { x: 1240, y: 930, width: 80, height: 40 }, // North Wall Right (opening x: 1160..1240 to Central Hallway)
+  { x: 1290, y: 960, width: 40, height: 150 }, // East Wall Top
+  { x: 1290, y: 1190, width: 40, height: 160 }, // East Wall Bottom (opening y: 1110..1190 to Shields Hallway)
+  { x: 920, y: 1330, width: 380, height: 40 }, // South Wall
 
   // ----------------------------------------------------
-  // 11. REACTOR WALLS
+  // 11. CENTRAL HALLWAY & ADMIN WALLS
   // ----------------------------------------------------
-  { x: 60, y: 580, width: 140, height: 40 }, // North Wall (opening x: 200..340 to corr-react-upper)
-  { x: 60, y: 580, width: 40, height: 500 }, // West Outer Hull
-  { x: 60, y: 1060, width: 140, height: 40 }, // South Wall (opening x: 200..340 to corr-react-lower)
-  { x: 420, y: 580, width: 40, height: 140 }, // East Wall Top
-  { x: 420, y: 840, width: 40, height: 240 }, // East Wall Bottom (opening y: 720..840)
+  { x: 1120, y: 710, width: 40, height: 270 }, // Central Hallway West Wall
+  { x: 1240, y: 710, width: 40, height: 130 }, // Central Hallway East Wall Top
+  { x: 1240, y: 920, width: 40, height: 60 }, // Central Hallway East Wall Bottom (opening y: 840..920 to Admin)
+  { x: 1340, y: 750, width: 320, height: 40 }, // Admin North Wall
+  { x: 1340, y: 990, width: 320, height: 40 }, // Admin South Wall
+  { x: 1630, y: 780, width: 40, height: 230 }, // Admin East Wall
+  { x: 1320, y: 780, width: 40, height: 60 }, // Admin West Wall Top
+  { x: 1320, y: 920, width: 40, height: 80 }, // Admin West Wall Bottom (opening y: 840..920)
 
   // ----------------------------------------------------
-  // 12. UPPER ENGINE WALLS
+  // 12. WEAPONS & O2 & EAST HALLWAY WALLS
   // ----------------------------------------------------
-  { x: 260, y: 300, width: 340, height: 40 }, // North Wall
-  { x: 220, y: 300, width: 40, height: 260 }, // West Wall Top (opening y: 560..660)
-  { x: 600, y: 300, width: 40, height: 140 }, // East Wall Top
-  { x: 600, y: 560, width: 40, height: 120 }, // East Wall Bottom (opening y: 440..560)
-  { x: 340, y: 620, width: 260, height: 40 }, // South Wall (opening x: 200..340 to Reactor)
+  { x: 1560, y: 250, width: 300, height: 40 }, // Weapons North Wall
+  { x: 1830, y: 280, width: 40, height: 300 }, // Weapons East Wall
+  { x: 1540, y: 280, width: 40, height: 100 }, // Weapons West Wall Top
+  { x: 1540, y: 460, width: 40, height: 110 }, // Weapons West Wall Bottom (opening y: 380..460 to Cafeteria)
+  { x: 1560, y: 550, width: 90, height: 40 }, // Weapons South Wall Left
+  { x: 1730, y: 550, width: 120, height: 40 }, // Weapons South Wall Right (opening x: 1650..1730 to East Hub)
+  { x: 1440, y: 550, width: 210, height: 40 }, // O2 North Wall
+  { x: 1430, y: 580, width: 40, height: 190 }, // O2 West Wall
+  { x: 1440, y: 750, width: 210, height: 40 }, // O2 South Wall
+  { x: 1640, y: 580, width: 40, height: 50 }, // O2 East Wall Top
+  { x: 1640, y: 710, width: 40, height: 60 }, // O2 East Wall Bottom (opening y: 630..710 to East Hub)
 
   // ----------------------------------------------------
-  // 13. LOWER ENGINE WALLS
+  // 13. NAVIGATION WALLS (x: 1960..2300, y: 620..940)
   // ----------------------------------------------------
-  { x: 340, y: 1040, width: 260, height: 40 }, // North Wall (opening x: 200..340 to Reactor)
-  { x: 220, y: 1120, width: 40, height: 320 }, // West Wall Bottom (below corridor y: 1120..1440)
-  { x: 600, y: 1040, width: 40, height: 100 }, // East Wall Top
-  { x: 600, y: 1260, width: 40, height: 180 }, // East Wall Bottom (opening y: 1140..1260)
-  { x: 260, y: 1420, width: 340, height: 40 }, // South Wall
+  { x: 1960, y: 590, width: 350, height: 40 }, // North Wall
+  { x: 2280, y: 620, width: 40, height: 330 }, // Far East Pointed Cockpit Nose
+  { x: 1960, y: 930, width: 350, height: 40 }, // South Wall
+  { x: 1940, y: 620, width: 40, height: 50 }, // West Wall Top
+  { x: 1940, y: 750, width: 40, height: 60 }, // West Wall Middle (Top opening y: 670..750 from East Hub)
+  { x: 1940, y: 890, width: 40, height: 50 }, // West Wall Bottom (Bottom opening y: 810..890 from Shields)
 
   // ----------------------------------------------------
-  // 14. MEDBAY WALLS
+  // 14. SHIELDS & COMMS & STORAGE-SHIELDS HALLWAY WALLS
   // ----------------------------------------------------
-  { x: 620, y: 320, width: 300, height: 40 }, // North Wall
-  { x: 580, y: 320, width: 40, height: 120 }, // West Wall Top (opening y: 440..560)
-  { x: 920, y: 320, width: 40, height: 140 }, // East Wall Top (opening y: 460..580)
-  { x: 920, y: 580, width: 40, height: 60 }, // East Wall Bottom
+  { x: 1600, y: 1010, width: 50, height: 40 }, // Shields North Wall Left
+  { x: 1730, y: 1010, width: 200, height: 40 }, // Shields North Wall Right (opening x: 1650..1730 to East Hub)
+  { x: 1900, y: 1040, width: 40, height: 50 }, // Shields East Wall Top
+  { x: 1900, y: 1170, width: 40, height: 140 }, // Shields East Wall Bottom (opening y: 1090..1170 to Nav branch)
+  { x: 1600, y: 1290, width: 330, height: 40 }, // Shields South Wall
+  { x: 1600, y: 1040, width: 40, height: 70 }, // Shields West Wall Top
+  { x: 1600, y: 1190, width: 40, height: 110 }, // Shields West Wall Bottom (opening y: 1110..1190 to Storage Hallway)
+  { x: 1260, y: 1210, width: 100, height: 40 }, // Communications North Wall Left
+  { x: 1440, y: 1210, width: 100, height: 40 }, // Communications North Wall Right (opening x: 1360..1440)
+  { x: 1260, y: 1410, width: 280, height: 40 }, // Communications South Wall
+  { x: 1250, y: 1240, width: 40, height: 180 }, // Communications West Wall
+  { x: 1510, y: 1240, width: 40, height: 180 }, // Communications East Wall
 
   // ====================================================
   // ROOM FURNITURE & OBSTACLE COLLIDERS
@@ -350,100 +381,52 @@ export const WALLS: WallBox[] = [
 
   // --- CAFETERIA ---
   // Large Central Meeting Table & chairs
-  { x: 1110, y: 590, width: 180, height: 100, isObstacle: true },
-  // Side Dining Tables
-  { x: 980, y: 560, width: 60, height: 35, isObstacle: true },
-  { x: 1360, y: 560, width: 60, height: 35, isObstacle: true },
-  // Vending Machine (North Wall Left)
-  { x: 960, y: 430, width: 36, height: 24, isObstacle: true },
-  // Vending Machine (North Wall Right)
-  { x: 1400, y: 430, width: 36, height: 24, isObstacle: true },
-  // Food Counter (South-West near exit)
-  { x: 940, y: 790, width: 70, height: 28, isObstacle: true },
+  { x: 1120, y: 460, width: 160, height: 80, isObstacle: true },
+  // 4 Outer Dining Tables
+  { x: 1040, y: 380, width: 60, height: 35, isObstacle: true },
+  { x: 1300, y: 380, width: 60, height: 35, isObstacle: true },
+  { x: 1040, y: 580, width: 60, height: 35, isObstacle: true },
+  { x: 1300, y: 580, width: 60, height: 35, isObstacle: true },
 
   // --- REACTOR ---
-  // Reactor Core & Containment Ring
-  { x: 195, y: 785, width: 110, height: 110, isObstacle: true },
+  // Reactor Core Pillar & Containment
+  { x: 120, y: 770, width: 100, height: 100, isObstacle: true },
   // Left Hand-Scanner Station (Upper)
-  { x: 120, y: 660, width: 40, height: 30, isObstacle: true },
+  { x: 90, y: 680, width: 40, height: 30, isObstacle: true },
   // Right Hand-Scanner Station (Lower)
-  { x: 120, y: 990, width: 40, height: 30, isObstacle: true },
+  { x: 90, y: 930, width: 40, height: 30, isObstacle: true },
 
   // --- UPPER ENGINE ---
-  // Engine Turbine
-  { x: 405, y: 465, width: 60, height: 70, isObstacle: true },
-  // Engine Control Panel
-  { x: 300, y: 355, width: 55, height: 22, isObstacle: true },
+  { x: 370, y: 430, width: 60, height: 70, isObstacle: true },
 
   // --- LOWER ENGINE ---
-  // Engine Turbine
-  { x: 405, y: 1205, width: 60, height: 70, isObstacle: true },
-  // Engine Control Panel
-  { x: 300, y: 1385, width: 55, height: 22, isObstacle: true },
+  { x: 370, y: 1150, width: 60, height: 70, isObstacle: true },
 
   // --- MEDBAY ---
-  // Scanner Platform
-  { x: 760, y: 470, width: 50, height: 26, isObstacle: true },
-  // Hospital Bed Cluster
-  { x: 650, y: 350, width: 70, height: 40, isObstacle: true },
-  // Medicine Cabinet (East Wall)
-  { x: 890, y: 420, width: 22, height: 50, isObstacle: true },
+  { x: 810, y: 650, width: 50, height: 30, isObstacle: true }, // Scan Pad
+  { x: 710, y: 530, width: 150, height: 40, isObstacle: true }, // Beds
 
   // --- ADMIN ---
-  // Large Hologram Map Table
-  { x: 1610, y: 1000, width: 80, height: 40, isObstacle: true },
-  // Card Swipe Terminal (East Wall)
-  { x: 1780, y: 940, width: 22, height: 36, isObstacle: true },
+  { x: 1440, y: 870, width: 90, height: 45, isObstacle: true }, // Hologram Map Table
 
   // --- ELECTRICAL ---
-  // Central Transformer Generator
-  { x: 730, y: 1040, width: 55, height: 60, isObstacle: true },
-  // Electrical Panel Row (North Wall)
-  { x: 650, y: 930, width: 200, height: 18, isObstacle: true },
+  { x: 730, y: 1000, width: 60, height: 60, isObstacle: true }, // Generator
 
   // --- SECURITY ---
-  // CCTV Desk
-  { x: 740, y: 720, width: 60, height: 24, isObstacle: true },
-  // Filing Cabinet (Corner)
-  { x: 860, y: 660, width: 22, height: 40, isObstacle: true },
+  { x: 610, y: 740, width: 60, height: 30, isObstacle: true }, // Desk
 
   // --- STORAGE ---
-  // Crate Stack (Center-Left)
-  { x: 990, y: 1090, width: 75, height: 75, isObstacle: true },
-  // Crate Stack (Center-Right)
-  { x: 1080, y: 1160, width: 50, height: 50, isObstacle: true },
-  // Fuel Canister Station (South-East)
-  { x: 1200, y: 1360, width: 50, height: 40, isObstacle: true },
-  // Garbage Compactor (Bottom)
-  { x: 1140, y: 1400, width: 45, height: 35, isObstacle: true },
+  { x: 1050, y: 1100, width: 90, height: 90, isObstacle: true }, // Central Crates
+  { x: 1220, y: 1240, width: 50, height: 40, isObstacle: true }, // Fuel Station
 
   // --- O2 ---
-  // Greenhouse Dome (Main)
-  { x: 1640, y: 760, width: 44, height: 44, isObstacle: true },
-  // Plant Pots Row (South Wall)
-  { x: 1580, y: 840, width: 80, height: 18, isObstacle: true },
+  { x: 1530, y: 650, width: 50, height: 50, isObstacle: true }, // Greenhouse Dome
 
   // --- SHIELDS ---
-  // Shield Energy Generator Core
-  { x: 1755, y: 1280, width: 50, height: 50, isObstacle: true },
+  { x: 1740, y: 1140, width: 60, height: 60, isObstacle: true }, // Shield Generator
 
   // --- NAVIGATION ---
-  // Steering Consoles (Far East)
-  { x: 2300, y: 810, width: 30, height: 70, isObstacle: true },
-  // Pilot Seat Left
-  { x: 2200, y: 730, width: 28, height: 28, isObstacle: true },
-  // Pilot Seat Right
-  { x: 2200, y: 930, width: 28, height: 28, isObstacle: true },
-
-  // --- WEAPONS ---
-  // Asteroid Shooter Console
-  { x: 1850, y: 470, width: 45, height: 36, isObstacle: true },
-  // Weapon Rack (West Wall)
-  { x: 1620, y: 365, width: 18, height: 60, isObstacle: true },
-
-  // --- COMMUNICATIONS ---
-  // Radio Console (Center)
-  { x: 1395, y: 1330, width: 55, height: 40, isObstacle: true },
+  { x: 2200, y: 750, width: 30, height: 70, isObstacle: true }, // Steering Consoles
 ];
 
 // ============================================================================
@@ -451,44 +434,37 @@ export const WALLS: WallBox[] = [
 // ============================================================================
 export const LOCKED_DOOR_WALLS: Record<string, WallBox[]> = {
   cafeteria: [
-    { x: 880, y: 460, width: 40, height: 120, isObstacle: true }, // NW doorway
-    { x: 1480, y: 460, width: 40, height: 120, isObstacle: true }, // NE doorway
-    { x: 1080, y: 860, width: 200, height: 40, isObstacle: true }, // South doorway
+    { x: 930, y: 410, width: 40, height: 80, isObstacle: true }, // West doorway
+    { x: 1430, y: 380, width: 40, height: 80, isObstacle: true }, // East doorway
+    { x: 1160, y: 710, width: 80, height: 40, isObstacle: true }, // South doorway
   ],
   medbay: [
-    { x: 880, y: 460, width: 40, height: 120, isObstacle: true },
-    { x: 680, y: 600, width: 160, height: 40, isObstacle: true },
+    { x: 750, y: 490, width: 80, height: 40, isObstacle: true },
   ],
   security: [
-    { x: 580, y: 720, width: 40, height: 120, isObstacle: true },
-    { x: 680, y: 600, width: 160, height: 40, isObstacle: true },
-    { x: 680, y: 880, width: 160, height: 40, isObstacle: true },
+    { x: 560, y: 780, width: 40, height: 70, isObstacle: true },
   ],
   electrical: [
-    { x: 680, y: 880, width: 160, height: 40, isObstacle: true },
-    { x: 920, y: 1120, width: 40, height: 140, isObstacle: true },
-    { x: 580, y: 1140, width: 40, height: 120, isObstacle: true },
+    { x: 720, y: 1130, width: 80, height: 40, isObstacle: true },
   ],
   storage: [
-    { x: 1080, y: 980, width: 200, height: 40, isObstacle: true },
-    { x: 1260, y: 960, width: 40, height: 120, isObstacle: true },
-    { x: 860, y: 1120, width: 40, height: 140, isObstacle: true },
+    { x: 890, y: 1210, width: 40, height: 80, isObstacle: true },
+    { x: 1160, y: 930, width: 80, height: 40, isObstacle: true },
+    { x: 1290, y: 1110, width: 40, height: 80, isObstacle: true },
   ],
   admin: [
-    { x: 1460, y: 960, width: 40, height: 120, isObstacle: true },
+    { x: 1320, y: 840, width: 40, height: 80, isObstacle: true },
   ],
   reactor: [
-    { x: 200, y: 560, width: 140, height: 40, isObstacle: true },
-    { x: 200, y: 1020, width: 140, height: 40, isObstacle: true },
-    { x: 420, y: 720, width: 40, height: 120, isObstacle: true },
+    { x: 270, y: 770, width: 40, height: 80, isObstacle: true },
   ],
   upper_engine: [
-    { x: 600, y: 440, width: 40, height: 120, isObstacle: true },
-    { x: 200, y: 580, width: 140, height: 40, isObstacle: true },
+    { x: 550, y: 410, width: 40, height: 80, isObstacle: true },
+    { x: 360, y: 590, width: 80, height: 40, isObstacle: true },
   ],
   lower_engine: [
-    { x: 600, y: 1140, width: 40, height: 120, isObstacle: true },
-    { x: 200, y: 1060, width: 140, height: 40, isObstacle: true },
+    { x: 360, y: 1010, width: 80, height: 40, isObstacle: true },
+    { x: 550, y: 1210, width: 40, height: 80, isObstacle: true },
   ],
 };
 
@@ -566,7 +542,7 @@ export function resolvePlayerMovement(
   if (isGhost) {
     return {
       x: Math.max(60, Math.min(MAP_WIDTH - 60, currentX + moveDx)),
-      y: Math.max(340, Math.min(MAP_HEIGHT - 120, currentY + moveDy)),
+      y: Math.max(280, Math.min(MAP_HEIGHT - 120, currentY + moveDy)),
       moved: moveDx !== 0 || moveDy !== 0,
     };
   }
@@ -593,7 +569,7 @@ export function resolvePlayerMovement(
     // Try moving in Y axis
     const nextY = py + stepY;
     if (!checkCollision(px, nextY, radius, false, lockedDoors)) {
-      py = Math.max(340, Math.min(MAP_HEIGHT - 120, nextY));
+      py = Math.max(280, Math.min(MAP_HEIGHT - 120, nextY));
     }
   }
 
@@ -665,51 +641,68 @@ export interface Waypoint {
 
 export const WAYPOINTS: Waypoint[] = [
   // Cafeteria
-  { id: 'wp-caf-center', x: 1200, y: 510, room: 'Cafeteria', neighbors: ['wp-caf-nw', 'wp-caf-ne', 'wp-caf-s'] },
-  { id: 'wp-caf-nw', x: 1000, y: 490, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-medbay'] },
-  { id: 'wp-caf-ne', x: 1400, y: 490, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-weapons'] },
-  { id: 'wp-caf-s', x: 1180, y: 820, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-storage-n'] },
+  { id: 'wp-caf-center', x: 1200, y: 480, room: 'Cafeteria', neighbors: ['wp-caf-nw', 'wp-caf-ne', 'wp-caf-s'] },
+  { id: 'wp-caf-nw', x: 1040, y: 450, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-upper-hall-e'] },
+  { id: 'wp-caf-ne', x: 1360, y: 430, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-caf-weap'] },
+  { id: 'wp-caf-s', x: 1200, y: 680, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-center-hall'] },
 
-  // Medbay & Upper Engine
-  { id: 'wp-medbay', x: 840, y: 500, room: 'MedBay', neighbors: ['wp-caf-nw', 'wp-upper-engine', 'wp-security'] },
-  { id: 'wp-upper-engine', x: 500, y: 440, room: 'Upper Engine', neighbors: ['wp-medbay', 'wp-reactor-top'] },
+  // Upper Hallway & MedBay
+  { id: 'wp-upper-hall-e', x: 900, y: 450, room: 'Oberer Flur', neighbors: ['wp-caf-nw', 'wp-upper-hall-m'] },
+  { id: 'wp-upper-hall-m', x: 780, y: 450, room: 'Oberer Flur', neighbors: ['wp-upper-hall-e', 'wp-upper-hall-w', 'wp-medbay'] },
+  { id: 'wp-upper-hall-w', x: 600, y: 450, room: 'Oberer Flur', neighbors: ['wp-upper-hall-m', 'wp-upper-engine-e'] },
+  { id: 'wp-medbay', x: 780, y: 640, room: 'MedBay', neighbors: ['wp-upper-hall-m'] },
 
-  // Reactor
-  { id: 'wp-reactor-top', x: 220, y: 640, room: 'Reactor', neighbors: ['wp-upper-engine', 'wp-reactor-mid'] },
-  { id: 'wp-reactor-mid', x: 360, y: 780, room: 'Reactor', neighbors: ['wp-reactor-top', 'wp-reactor-bot', 'wp-security'] },
-  { id: 'wp-reactor-bot', x: 220, y: 1000, room: 'Reactor', neighbors: ['wp-reactor-mid', 'wp-lower-engine'] },
+  // Upper Engine
+  { id: 'wp-upper-engine-e', x: 480, y: 450, room: 'Upper Engine', neighbors: ['wp-upper-hall-w', 'wp-upper-engine-s'] },
+  { id: 'wp-upper-engine-s', x: 400, y: 560, room: 'Upper Engine', neighbors: ['wp-upper-engine-e', 'wp-west-cross-mid'] },
 
-  // Security & Electrical
-  { id: 'wp-security', x: 680, y: 740, room: 'Security', neighbors: ['wp-medbay', 'wp-reactor-mid', 'wp-electrical'] },
-  { id: 'wp-electrical', x: 720, y: 980, room: 'Electrical', neighbors: ['wp-security', 'wp-storage-w', 'wp-lower-engine'] },
+  // West Cross Junction
+  { id: 'wp-west-cross-mid', x: 400, y: 810, room: 'Reaktor-Kreuzung', neighbors: ['wp-upper-engine-s', 'wp-lower-engine-n', 'wp-reactor', 'wp-security'] },
+  { id: 'wp-reactor', x: 180, y: 810, room: 'Reactor', neighbors: ['wp-west-cross-mid'] },
+  { id: 'wp-security', x: 660, y: 810, room: 'Security', neighbors: ['wp-west-cross-mid'] },
 
   // Lower Engine
-  { id: 'wp-lower-engine', x: 500, y: 1200, room: 'Lower Engine', neighbors: ['wp-reactor-bot', 'wp-electrical'] },
+  { id: 'wp-lower-engine-n', x: 400, y: 1080, room: 'Lower Engine', neighbors: ['wp-west-cross-mid', 'wp-lower-engine-e'] },
+  { id: 'wp-lower-engine-e', x: 480, y: 1250, room: 'Lower Engine', neighbors: ['wp-lower-engine-n', 'wp-lower-hall-w'] },
+
+  // Lower Hallway & Electrical
+  { id: 'wp-lower-hall-w', x: 640, y: 1250, room: 'Unterer Flur', neighbors: ['wp-lower-engine-e', 'wp-lower-hall-m'] },
+  { id: 'wp-lower-hall-m', x: 760, y: 1250, room: 'Unterer Flur', neighbors: ['wp-lower-hall-w', 'wp-electrical', 'wp-lower-hall-e'] },
+  { id: 'wp-electrical', x: 760, y: 1040, room: 'Electrical', neighbors: ['wp-lower-hall-m'] },
+  { id: 'wp-lower-hall-e', x: 880, y: 1250, room: 'Unterer Flur', neighbors: ['wp-lower-hall-m', 'wp-storage-w'] },
 
   // Storage
-  { id: 'wp-storage-n', x: 1180, y: 1060, room: 'Storage', neighbors: ['wp-caf-s', 'wp-storage-center'] },
-  { id: 'wp-storage-center', x: 1120, y: 1240, room: 'Storage', neighbors: ['wp-storage-n', 'wp-storage-w', 'wp-storage-e', 'wp-comms'] },
-  { id: 'wp-storage-w', x: 940, y: 1180, room: 'Storage', neighbors: ['wp-storage-center', 'wp-electrical'] },
-  { id: 'wp-storage-e', x: 1240, y: 1040, room: 'Storage', neighbors: ['wp-storage-center', 'wp-admin'] },
+  { id: 'wp-storage-w', x: 1000, y: 1250, room: 'Storage', neighbors: ['wp-lower-hall-e', 'wp-storage-center'] },
+  { id: 'wp-storage-center', x: 1110, y: 1100, room: 'Storage', neighbors: ['wp-storage-w', 'wp-storage-n', 'wp-storage-e', 'wp-storage-s'] },
+  { id: 'wp-storage-n', x: 1200, y: 1000, room: 'Storage', neighbors: ['wp-storage-center', 'wp-center-hall'] },
+  { id: 'wp-storage-e', x: 1260, y: 1150, room: 'Storage', neighbors: ['wp-storage-center', 'wp-stor-shields-m'] },
+  { id: 'wp-storage-s', x: 1200, y: 1300, room: 'Storage', neighbors: ['wp-storage-center'] },
 
-  // Admin
-  { id: 'wp-admin', x: 1560, y: 1020, room: 'Admin', neighbors: ['wp-storage-e', 'wp-o2', 'wp-shields'] },
+  // Central Hallway & Admin
+  { id: 'wp-center-hall', x: 1200, y: 850, room: 'Zentralflur', neighbors: ['wp-caf-s', 'wp-storage-n', 'wp-admin'] },
+  { id: 'wp-admin', x: 1460, y: 880, room: 'Admin', neighbors: ['wp-center-hall'] },
 
-  // Communications
-  { id: 'wp-comms', x: 1420, y: 1340, room: 'Communications', neighbors: ['wp-storage-center', 'wp-shields'] },
+  // Communications & Shields-Storage Hallway
+  { id: 'wp-stor-shields-m', x: 1400, y: 1150, room: 'Flur (Storage ➔ Shields)', neighbors: ['wp-storage-e', 'wp-comms', 'wp-shields-w'] },
+  { id: 'wp-comms', x: 1400, y: 1320, room: 'Communications', neighbors: ['wp-stor-shields-m'] },
+  { id: 'wp-shields-w', x: 1680, y: 1150, room: 'Shields', neighbors: ['wp-stor-shields-m', 'wp-shields-center'] },
 
   // Shields
-  { id: 'wp-shields', x: 1700, y: 1240, room: 'Shields', neighbors: ['wp-comms', 'wp-nav-s', 'wp-admin'] },
+  { id: 'wp-shields-center', x: 1770, y: 1170, room: 'Shields', neighbors: ['wp-shields-w', 'wp-east-hub-s', 'wp-shields-e'] },
+  { id: 'wp-shields-e', x: 1880, y: 1150, room: 'Shields', neighbors: ['wp-shields-center', 'wp-nav-s'] },
 
-  // O2
-  { id: 'wp-o2', x: 1600, y: 780, room: 'O2', neighbors: ['wp-admin', 'wp-weapons', 'wp-nav-n'] },
-
-  // Weapons
-  { id: 'wp-weapons', x: 1760, y: 480, room: 'Weapons', neighbors: ['wp-caf-ne', 'wp-o2', 'wp-nav-n'] },
+  // Weapons & East Hub
+  { id: 'wp-caf-weap', x: 1500, y: 420, room: 'Flur (Cafeteria ➔ Weapons)', neighbors: ['wp-caf-ne', 'wp-weapons'] },
+  { id: 'wp-weapons', x: 1680, y: 420, room: 'Weapons', neighbors: ['wp-caf-weap', 'wp-east-hub-n'] },
+  { id: 'wp-east-hub-n', x: 1690, y: 600, room: 'Östlicher Flur', neighbors: ['wp-weapons', 'wp-o2', 'wp-east-hub-mid'] },
+  { id: 'wp-o2', x: 1560, y: 670, room: 'O2', neighbors: ['wp-east-hub-n'] },
+  { id: 'wp-east-hub-mid', x: 1690, y: 710, room: 'Östlicher Flur', neighbors: ['wp-east-hub-n', 'wp-nav-n', 'wp-east-hub-s'] },
+  { id: 'wp-east-hub-s', x: 1690, y: 980, room: 'Östlicher Flur', neighbors: ['wp-east-hub-mid', 'wp-shields-center'] },
 
   // Navigation
-  { id: 'wp-nav-n', x: 2100, y: 760, room: 'Navigation', neighbors: ['wp-weapons', 'wp-o2', 'wp-nav-s'] },
-  { id: 'wp-nav-s', x: 2100, y: 960, room: 'Navigation', neighbors: ['wp-nav-n', 'wp-shields'] },
+  { id: 'wp-nav-n', x: 2060, y: 710, room: 'Navigation', neighbors: ['wp-east-hub-mid', 'wp-nav-center'] },
+  { id: 'wp-nav-s', x: 2000, y: 920, room: 'Navigation', neighbors: ['wp-shields-e', 'wp-nav-center'] },
+  { id: 'wp-nav-center', x: 2160, y: 780, room: 'Navigation', neighbors: ['wp-nav-n', 'wp-nav-s'] },
 ];
 
 /**
@@ -729,7 +722,7 @@ export function getNearestWaypoint(x: number, y: number): Waypoint {
 }
 
 /**
- * Simple Dijkstra Pathfinding between waypoints for Bot navigation
+ * Dijkstra Pathfinding between waypoints for Bot navigation
  */
 export function findBotPath(startX: number, startY: number, targetX: number, targetY: number): Waypoint[] {
   const startWp = getNearestWaypoint(startX, startY);
