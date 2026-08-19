@@ -601,7 +601,7 @@ function AmongUsApp() {
           break;
       }
     },
-    []
+    [localPlayerId]
   );
 
   // Initialize Host

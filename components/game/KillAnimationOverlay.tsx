@@ -29,7 +29,10 @@ export function KillAnimationOverlay({
 
   const [frame, setFrame] = useState(0);
   const onFinishedRef = useRef(onFinished);
-  onFinishedRef.current = onFinished;
+
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
 
   useEffect(() => {
     // Play dramatic kill sound once

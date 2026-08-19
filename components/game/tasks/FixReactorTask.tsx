@@ -30,11 +30,16 @@ export function FixReactorTask({ onComplete, onClose }: FixReactorTaskProps) {
           return prev + 5;
         });
       }, 100);
-    } else if (!holding && progress < 100) {
-      setProgress(0);
     }
     return () => clearInterval(timer);
-  }, [holding, isDone, progress, onComplete]);
+  }, [holding, isDone, onComplete]);
+
+  const handleRelease = () => {
+    setHolding(false);
+    if (!isDone) {
+      setProgress(0);
+    }
+  };
 
   return (
     <div className="relative bg-slate-900 border-4 border-red-500/80 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-red-500/20 text-white select-none">
@@ -66,10 +71,10 @@ export function FixReactorTask({ onComplete, onClose }: FixReactorTaskProps) {
 
         <button
           onMouseDown={() => setHolding(true)}
-          onMouseUp={() => setHolding(false)}
-          onMouseLeave={() => setHolding(false)}
+          onMouseUp={handleRelease}
+          onMouseLeave={handleRelease}
           onTouchStart={() => setHolding(true)}
-          onTouchEnd={() => setHolding(false)}
+          onTouchEnd={handleRelease}
           className={`w-36 h-36 rounded-2xl border-4 flex flex-col items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
             isDone
               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/30'

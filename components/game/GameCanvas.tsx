@@ -183,6 +183,19 @@ export function GameCanvas({
   const [sabotageCooldown, setSabotageCooldown] = useState(15);
   const [emergencyCooldown, setEmergencyCooldown] = useState(15);
 
+  // Sync cooldowns on role or settings change without cascading render in effect
+  const [prevRole, setPrevRole] = useState(localPlayer.role);
+  const [prevSettingsCd, setPrevSettingsCd] = useState(settings.killCooldown);
+
+  if (localPlayer.role !== prevRole || settings.killCooldown !== prevSettingsCd) {
+    setPrevRole(localPlayer.role);
+    setPrevSettingsCd(settings.killCooldown);
+    if (localPlayer.role === 'impostor') {
+      setKillCooldown(settings.killCooldown);
+    }
+    setEmergencyCooldown(15);
+  }
+
   // Nearby Action Targets
   const [nearbyTask, setNearbyTask] = useState<TaskDefinition | null>(null);
   const [nearbyEmergencyButton, setNearbyEmergencyButton] = useState(false);
@@ -207,14 +220,6 @@ export function GameCanvas({
     return () => clearInterval(timer);
   }, []);
 
-  // Reset kill cooldown and emergency cooldown when match starts or resumes
-  useEffect(() => {
-    if (localPlayer.role === 'impostor') {
-      setKillCooldown(settings.killCooldown);
-    }
-    setEmergencyCooldown(15);
-  }, [settings.killCooldown, localPlayer.role]);
-
   // Position initialization & Vent jump handling (NEVER overwrite during normal walking)
   const initialMountRef = useRef(false);
   const prevVentIdRef = useRef(localPlayer.ventId);
@@ -236,7 +241,7 @@ export function GameCanvas({
       }
     }
     prevVentIdRef.current = localPlayer.ventId;
-  }, [localPlayer.inVent, localPlayer.ventId]);
+  }, [localPlayer.inVent, localPlayer.ventId, localPlayer.x, localPlayer.y]);
 
   // Kill Action
   const handleKill = () => {

@@ -11,18 +11,15 @@ interface FixLightsTaskProps {
 
 export function FixLightsTask({ onComplete, onClose }: FixLightsTaskProps) {
   // 5 toggle switches (all must be turned ON / green)
-  const [switches, setSwitches] = useState<boolean[]>([false, false, false, false, false]);
-  const [isDone, setIsDone] = useState(false);
-
-  useEffect(() => {
-    // Generate initial random broken state with at least 2 off
+  const [switches, setSwitches] = useState<boolean[]>(() => {
     const initial = [false, false, false, false, false].map(() => Math.random() > 0.6);
     if (initial.every((s) => s)) {
       initial[0] = false;
       initial[2] = false;
     }
-    setSwitches(initial);
-  }, []);
+    return initial;
+  });
+  const [isDone, setIsDone] = useState(false);
 
   const handleToggle = (index: number) => {
     if (isDone) return;
