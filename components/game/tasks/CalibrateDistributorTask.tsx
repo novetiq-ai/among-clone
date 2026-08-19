@@ -25,6 +25,7 @@ export function CalibrateDistributorTask({ onComplete, onClose }: CalibrateDistr
   const [angles, setAngles] = useState<[number, number, number]>([0, 120, 240]);
   const [errorFlash, setErrorFlash] = useState(false);
   const [lockedSteps, setLockedSteps] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const lockedStepsRef = useRef<[boolean, boolean, boolean]>([false, false, false]);
 
   const anglesRef = useRef<[number, number, number]>([0, 120, 240]);
 
@@ -37,9 +38,9 @@ export function CalibrateDistributorTask({ onComplete, onClose }: CalibrateDistr
       lastTime = time;
 
       const nextAngles: [number, number, number] = [
-        (anglesRef.current[0] + DIAL_SPEEDS[0] * delta) % 360,
-        (anglesRef.current[1] + DIAL_SPEEDS[1] * delta) % 360,
-        (anglesRef.current[2] + DIAL_SPEEDS[2] * delta) % 360,
+        lockedStepsRef.current[0] ? anglesRef.current[0] : (anglesRef.current[0] + DIAL_SPEEDS[0] * delta) % 360,
+        lockedStepsRef.current[1] ? anglesRef.current[1] : (anglesRef.current[1] + DIAL_SPEEDS[1] * delta) % 360,
+        lockedStepsRef.current[2] ? anglesRef.current[2] : (anglesRef.current[2] + DIAL_SPEEDS[2] * delta) % 360,
       ];
       anglesRef.current = nextAngles;
       setAngles(nextAngles);
@@ -63,6 +64,7 @@ export function CalibrateDistributorTask({ onComplete, onClose }: CalibrateDistr
       sound.playShieldClick();
       const newLocked: [boolean, boolean, boolean] = [...lockedSteps];
       newLocked[stepIndex] = true;
+      lockedStepsRef.current = newLocked;
       setLockedSteps(newLocked);
 
       const nextStep = currentStep + 1;

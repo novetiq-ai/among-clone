@@ -32,6 +32,8 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
   const [draggingLeftId, setDraggingLeftId] = useState<string | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftPinRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const rightPinRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isAllConnected = 
     Object.keys(connections).length === 4 &&
@@ -48,19 +50,43 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
     }
   }, [isAllConnected]);
 
-  // Coordinates helper (Row height is 64px, top offset is 100px)
+  // Coordinates helper dynamically measuring pin elements
   const getLeftPinPos = (colorId: string) => {
+    const el = leftPinRefs.current[colorId];
+    if (el && containerRef.current) {
+      const contRect = containerRef.current.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      return {
+        x: elRect.left + elRect.width / 2 - contRect.left,
+        y: elRect.top + elRect.height / 2 - contRect.top,
+      };
+    }
     const idx = leftWires.findIndex((w) => w.id === colorId);
     return { x: 44, y: 104 + (idx >= 0 ? idx : 0) * 64 };
   };
 
   const getRightPinPos = (colorId: string) => {
+    const el = rightPinRefs.current[colorId];
+    if (el && containerRef.current) {
+      const contRect = containerRef.current.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      return {
+        x: elRect.left + elRect.width / 2 - contRect.left,
+        y: elRect.top + elRect.height / 2 - contRect.top,
+      };
+    }
     const idx = rightWires.findIndex((w) => w.id === colorId);
-    return { x: 436, y: 104 + (idx >= 0 ? idx : 0) * 64 };
+    const contWidth = containerRef.current?.clientWidth || 480;
+    return { x: contWidth - 44, y: 104 + (idx >= 0 ? idx : 0) * 64 };
   };
 
-  const handlePointerDown = (leftId: string, e: React.PointerEvent) => {
+  const handlePointerDown = (leftId: string, e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
     sound.playButtonClick();
     setDraggingLeftId(leftId);
     if (!containerRef.current) return;
@@ -227,8 +253,11 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
             return (
               <div key={`left-${wire.id}`} className="flex items-center gap-3">
                 <div
+                  ref={(el) => {
+                    leftPinRefs.current[wire.id] = el;
+                  }}
                   onPointerDown={(e) => handlePointerDown(wire.id, e)}
-                  className="w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-110 transition-transform"
+                  className="w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-110 transition-transform touch-manipulation"
                   style={{ backgroundColor: wire.hex }}
                 >
                   <div className="w-3 h-3 rounded-full bg-slate-900 border border-white/50" />
@@ -247,6 +276,9 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
               <div key={`right-${wire.id}`} className="flex items-center gap-3">
                 <div className="w-8 h-4 rounded-l-lg bg-slate-800 border-y border-l border-slate-700" />
                 <div
+                  ref={(el) => {
+                    rightPinRefs.current[wire.id] = el;
+                  }}
                   className={`w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center shadow-lg transition-all ${
                     isConnected ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900' : ''
                   }`}

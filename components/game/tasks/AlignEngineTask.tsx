@@ -27,7 +27,12 @@ export function AlignEngineTask({ onComplete, onClose }: AlignEngineTaskProps) {
   const [isDragging, setIsDragging] = useState(false);
   const sliderTrackRef = useRef<HTMLDivElement>(null);
 
-  const handlePointerDown = () => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
     setIsDragging(true);
   };
 

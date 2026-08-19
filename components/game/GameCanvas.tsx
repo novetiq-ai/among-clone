@@ -316,6 +316,27 @@ export function GameCanvas({
     }
   }, [onSecurityCamToggle]);
 
+  // Handle USE action (Task / Sabotage Fix / Emergency Button / CCTV / Admin Table)
+  const handleUseAction = useCallback(() => {
+    if (nearbyEmergencyButton) {
+      onEmergencyMeeting();
+    } else if (nearbyFixSabotage) {
+      if (nearbyFixSabotage === 'lights') {
+        setActiveTask({ id: 'fix_lights', type: 'fix_lights', name: 'Lichter reparieren', room: 'Electrical', x: 670, y: 960 });
+      } else if (nearbyFixSabotage === 'reactor') {
+        setActiveTask({ id: 'fix_reactor', type: 'fix_reactor', name: 'Reaktor stabilisieren', room: 'Reactor', x: 140, y: 720 });
+      } else if (onFixSabotage) {
+        onFixSabotage(nearbyFixSabotage);
+      }
+    } else if (nearbySecurityDesk) {
+      handleToggleCCTV(true);
+    } else if (nearbyAdminTable) {
+      setShowAdminRadar(true);
+    } else if (nearbyTask) {
+      setActiveTask(nearbyTask);
+    }
+  }, [nearbyEmergencyButton, onEmergencyMeeting, nearbyFixSabotage, onFixSabotage, nearbySecurityDesk, handleToggleCCTV, nearbyAdminTable, nearbyTask]);
+
   // Keyboard Event Listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -381,23 +402,7 @@ export function GameCanvas({
       // Space or E for USE / INTERACT
       if (e.key === ' ' || e.key.toLowerCase() === 'e') {
         e.preventDefault();
-        if (nearbyEmergencyButton) {
-          onEmergencyMeeting();
-        } else if (nearbyFixSabotage) {
-          if (nearbyFixSabotage === 'lights') {
-            setActiveTask({ id: 'fix_lights', type: 'fix_lights', name: 'Lichter reparieren', room: 'Electrical', x: 670, y: 960 });
-          } else if (nearbyFixSabotage === 'reactor') {
-            setActiveTask({ id: 'fix_reactor', type: 'fix_reactor', name: 'Reaktor stabilisieren', room: 'Reactor', x: 140, y: 720 });
-          } else if (onFixSabotage) {
-            onFixSabotage(nearbyFixSabotage);
-          }
-        } else if (nearbySecurityDesk) {
-          handleToggleCCTV(true);
-        } else if (nearbyAdminTable) {
-          setShowAdminRadar(true);
-        } else if (nearbyTask) {
-          setActiveTask(nearbyTask);
-        }
+        handleUseAction();
       }
 
       // Q for KILL (Impostor)
@@ -1011,8 +1016,14 @@ export function GameCanvas({
           <button
             type="button"
             onClick={handleVentToggle}
+            onTouchEnd={(e) => {
+              if (localPlayer.inVent || nearbyVent) {
+                e.preventDefault();
+                handleVentToggle();
+              }
+            }}
             disabled={!localPlayer.inVent && !nearbyVent}
-            className={`w-14 h-14 sm:w-18 sm:h-18 rounded-2xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation ${
+            className={`w-14 h-14 sm:w-18 sm:h-18 rounded-2xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation pointer-events-auto ${
               localPlayer.inVent
                 ? 'bg-red-600 border-white text-white animate-pulse'
                 : nearbyVent
@@ -1055,8 +1066,14 @@ export function GameCanvas({
           <button
             type="button"
             onClick={handleKill}
+            onTouchEnd={(e) => {
+              if (nearbyKillTarget && killCooldown === 0 && localPlayer.isAlive) {
+                e.preventDefault();
+                handleKill();
+              }
+            }}
             disabled={!nearbyKillTarget || killCooldown > 0 || !localPlayer.isAlive}
-            className={`relative w-16 h-16 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation ${
+            className={`relative w-16 h-16 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation pointer-events-auto ${
               nearbyKillTarget && killCooldown === 0
                 ? 'bg-red-600 hover:bg-red-500 border-red-300 text-white shadow-red-950/60 hover:scale-105 active:scale-90 animate-pulse'
                 : 'bg-slate-950/70 border-slate-800 text-slate-500 opacity-60 cursor-not-allowed'
@@ -1070,27 +1087,15 @@ export function GameCanvas({
         {/* USE / INTERACT / CONSOLE Button */}
         <button
           type="button"
-          onClick={() => {
-            if (nearbyEmergencyButton) {
-              onEmergencyMeeting();
-            } else if (nearbyFixSabotage) {
-              if (nearbyFixSabotage === 'lights') {
-                setActiveTask({ id: 'fix_lights', type: 'fix_lights', name: 'Lichter reparieren', room: 'Electrical', x: 670, y: 960 });
-              } else if (nearbyFixSabotage === 'reactor') {
-                setActiveTask({ id: 'fix_reactor', type: 'fix_reactor', name: 'Reaktor stabilisieren', room: 'Reactor', x: 140, y: 720 });
-              } else if (onFixSabotage) {
-                onFixSabotage(nearbyFixSabotage);
-              }
-            } else if (nearbySecurityDesk) {
-              handleToggleCCTV(true);
-            } else if (nearbyAdminTable) {
-              setShowAdminRadar(true);
-            } else if (nearbyTask) {
-              setActiveTask(nearbyTask);
+          onClick={handleUseAction}
+          onTouchEnd={(e) => {
+            if (nearbyTask || nearbyEmergencyButton || nearbySecurityDesk || nearbyAdminTable || nearbyFixSabotage) {
+              e.preventDefault();
+              handleUseAction();
             }
           }}
           disabled={!nearbyTask && !nearbyEmergencyButton && !nearbySecurityDesk && !nearbyAdminTable && !nearbyFixSabotage}
-          className={`w-16 h-16 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation ${
+          className={`w-16 h-16 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation pointer-events-auto ${
             nearbyEmergencyButton || nearbyFixSabotage
               ? 'bg-red-600 hover:bg-red-500 border-red-300 text-white shadow-red-950/60 hover:scale-105 active:scale-90 animate-bounce'
               : nearbySecurityDesk

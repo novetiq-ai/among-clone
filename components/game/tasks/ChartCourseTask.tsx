@@ -35,7 +35,12 @@ export function ChartCourseTask({ onComplete, onClose }: ChartCourseTaskProps) {
   const [shipPos, setShipPos] = useState<{ x: number; y: number }>({ x: 15, y: 50 });
   const mapRef = useRef<HTMLDivElement>(null);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
     setIsDragging(true);
   };
 

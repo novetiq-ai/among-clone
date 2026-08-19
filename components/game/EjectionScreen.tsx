@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { EjectionData } from '@/types/game';
 import { AstronautAvatar } from '@/components/AstronautAvatar';

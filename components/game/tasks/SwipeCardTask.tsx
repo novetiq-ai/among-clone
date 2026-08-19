@@ -41,8 +41,13 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
     return Math.max(0, Math.min(100, (currentX / totalWidth) * 100));
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!cardTaken || swipeStatus === 'accepted') return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
     const pct = getPercent(e.clientX);
     startTimeRef.current = now;
