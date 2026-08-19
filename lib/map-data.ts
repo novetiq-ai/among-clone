@@ -347,34 +347,103 @@ export const WALLS: WallBox[] = [
   // ====================================================
   // ROOM FURNITURE & OBSTACLE COLLIDERS
   // ====================================================
-  // Cafeteria Meeting Table (Center table & chairs)
+
+  // --- CAFETERIA ---
+  // Large Central Meeting Table & chairs
   { x: 1110, y: 590, width: 180, height: 100, isObstacle: true },
-  // Cafeteria Dining Tables (Positioned below the top consoles)
+  // Side Dining Tables
   { x: 980, y: 560, width: 60, height: 35, isObstacle: true },
   { x: 1360, y: 560, width: 60, height: 35, isObstacle: true },
-  // Reactor Core & Cooling Columns
+  // Vending Machine (North Wall Left)
+  { x: 960, y: 430, width: 36, height: 24, isObstacle: true },
+  // Vending Machine (North Wall Right)
+  { x: 1400, y: 430, width: 36, height: 24, isObstacle: true },
+  // Food Counter (South-West near exit)
+  { x: 940, y: 790, width: 70, height: 28, isObstacle: true },
+
+  // --- REACTOR ---
+  // Reactor Core & Containment Ring
   { x: 195, y: 785, width: 110, height: 110, isObstacle: true },
-  // Upper & Lower Engine Turbines
+  // Left Hand-Scanner Station (Upper)
+  { x: 120, y: 660, width: 40, height: 30, isObstacle: true },
+  // Right Hand-Scanner Station (Lower)
+  { x: 120, y: 990, width: 40, height: 30, isObstacle: true },
+
+  // --- UPPER ENGINE ---
+  // Engine Turbine
   { x: 405, y: 465, width: 60, height: 70, isObstacle: true },
+  // Engine Control Panel
+  { x: 300, y: 355, width: 55, height: 22, isObstacle: true },
+
+  // --- LOWER ENGINE ---
+  // Engine Turbine
   { x: 405, y: 1205, width: 60, height: 70, isObstacle: true },
-  // MedBay Scanner Platform & Beds
-  { x: 650, y: 350, width: 70, height: 40, isObstacle: true },
+  // Engine Control Panel
+  { x: 300, y: 1385, width: 55, height: 22, isObstacle: true },
+
+  // --- MEDBAY ---
+  // Scanner Platform
   { x: 760, y: 470, width: 50, height: 26, isObstacle: true },
-  // Admin Hologram Map Table
+  // Hospital Bed Cluster
+  { x: 650, y: 350, width: 70, height: 40, isObstacle: true },
+  // Medicine Cabinet (East Wall)
+  { x: 890, y: 420, width: 22, height: 50, isObstacle: true },
+
+  // --- ADMIN ---
+  // Large Hologram Map Table
   { x: 1610, y: 1000, width: 80, height: 40, isObstacle: true },
-  // Electrical Central Transformer Generator
+  // Card Swipe Terminal (East Wall)
+  { x: 1780, y: 940, width: 22, height: 36, isObstacle: true },
+
+  // --- ELECTRICAL ---
+  // Central Transformer Generator
   { x: 730, y: 1040, width: 55, height: 60, isObstacle: true },
-  // Security CCTV Desk
+  // Electrical Panel Row (North Wall)
+  { x: 650, y: 930, width: 200, height: 18, isObstacle: true },
+
+  // --- SECURITY ---
+  // CCTV Desk
   { x: 740, y: 720, width: 60, height: 24, isObstacle: true },
-  // Storage Crates & Fuel Station
+  // Filing Cabinet (Corner)
+  { x: 860, y: 660, width: 22, height: 40, isObstacle: true },
+
+  // --- STORAGE ---
+  // Crate Stack (Center-Left)
   { x: 990, y: 1090, width: 75, height: 75, isObstacle: true },
-  { x: 1280, y: 1300, width: 60, height: 60, isObstacle: true },
-  // O2 Greenhouse Dome
+  // Crate Stack (Center-Right)
+  { x: 1080, y: 1160, width: 50, height: 50, isObstacle: true },
+  // Fuel Canister Station (South-East)
+  { x: 1200, y: 1360, width: 50, height: 40, isObstacle: true },
+  // Garbage Compactor (Bottom)
+  { x: 1140, y: 1400, width: 45, height: 35, isObstacle: true },
+
+  // --- O2 ---
+  // Greenhouse Dome (Main)
   { x: 1640, y: 760, width: 44, height: 44, isObstacle: true },
-  // Shields Energy Generator
+  // Plant Pots Row (South Wall)
+  { x: 1580, y: 840, width: 80, height: 18, isObstacle: true },
+
+  // --- SHIELDS ---
+  // Shield Energy Generator Core
   { x: 1755, y: 1280, width: 50, height: 50, isObstacle: true },
-  // Navigation Steering Consoles
+
+  // --- NAVIGATION ---
+  // Steering Consoles (Far East)
   { x: 2300, y: 810, width: 30, height: 70, isObstacle: true },
+  // Pilot Seat Left
+  { x: 2200, y: 730, width: 28, height: 28, isObstacle: true },
+  // Pilot Seat Right
+  { x: 2200, y: 930, width: 28, height: 28, isObstacle: true },
+
+  // --- WEAPONS ---
+  // Asteroid Shooter Console
+  { x: 1850, y: 470, width: 45, height: 36, isObstacle: true },
+  // Weapon Rack (West Wall)
+  { x: 1620, y: 365, width: 18, height: 60, isObstacle: true },
+
+  // --- COMMUNICATIONS ---
+  // Radio Console (Center)
+  { x: 1395, y: 1330, width: 55, height: 40, isObstacle: true },
 ];
 
 // ============================================================================

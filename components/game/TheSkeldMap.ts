@@ -144,6 +144,9 @@ export function drawTheSkeld(
   // 5. Draw Hazard Stripes & Room Decals
   drawRoomDecals(ctx, time);
 
+  // NEW: Draw corridor details
+  drawCorridorDetails(ctx, time);
+
   // 6. Draw Detailed Room Furniture & Machines (Cafeteria, Reactor, Engines, Admin, Medbay, Shields, etc.)
   drawDetailedRoomObjects(ctx, time, localPlayer);
 
@@ -267,32 +270,76 @@ function drawDeepSpace(ctx: CanvasRenderingContext2D, time: number) {
   }
 }
 
+
+function drawCorridorDetails(ctx: CanvasRenderingContext2D, time: number) {
+  for (const corr of CORRIDORS) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 4;
+    
+    if (corr.width > corr.height) { // horizontal
+      ctx.beginPath();
+      ctx.moveTo(corr.x, corr.y + 10);
+      ctx.lineTo(corr.x + corr.width, corr.y + 10);
+      ctx.stroke();
+      
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(corr.x + corr.width/2 - 10, corr.y + corr.height/2 - 10);
+      ctx.lineTo(corr.x + corr.width/2 + 10, corr.y + corr.height/2);
+      ctx.lineTo(corr.x + corr.width/2 - 10, corr.y + corr.height/2 + 10);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(corr.x + 10, corr.y);
+      ctx.lineTo(corr.x + 10, corr.y + corr.height);
+      ctx.stroke();
+      
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(corr.x + corr.width/2 - 10, corr.y + corr.height/2 - 10);
+      ctx.lineTo(corr.x + corr.width/2 + 10, corr.y + corr.height/2 - 10);
+      ctx.lineTo(corr.x + corr.width/2, corr.y + corr.height/2 + 10);
+      ctx.fill();
+    }
+    
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(corr.x + corr.width/2 - 15, corr.y + corr.height/2 - 15, 30, 30);
+  }
+}
+
 // Outer Ship Hull Silhouette & Realistic Spaceship Outlines
+
 function drawShipHull(ctx: CanvasRenderingContext2D, time: number) {
-  // Deep Navy Exterior Armor Plate
   ctx.fillStyle = '#0b1120';
   ctx.beginPath();
-  // Complex spaceship contour
-  ctx.roundRect(50, 320, 2300, 1220, 48);
+  ctx.moveTo(300, 800);
+  ctx.lineTo(200, 320);
+  ctx.lineTo(800, 300);
+  ctx.lineTo(1600, 300);
+  ctx.quadraticCurveTo(2400, 300, 2400, 800);
+  ctx.quadraticCurveTo(2400, 1300, 1600, 1300);
+  ctx.lineTo(800, 1300);
+  ctx.lineTo(200, 1280);
+  ctx.closePath();
   ctx.fill();
+  
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 12;
+  ctx.stroke();
 
-  // Left Rear Thruster Engine Pods
   ctx.fillStyle = '#1e293b';
-  // Top Engine Nozzle
   ctx.beginPath();
-  ctx.roundRect(10, 420, 60, 160, [16, 0, 0, 16]);
+  ctx.roundRect(10, 420, 190, 160, [16, 0, 0, 16]);
   ctx.fill();
   ctx.strokeStyle = '#0f172a';
   ctx.lineWidth = 4;
   ctx.stroke();
 
-  // Bottom Engine Nozzle
   ctx.beginPath();
-  ctx.roundRect(10, 1140, 60, 160, [16, 0, 0, 16]);
+  ctx.roundRect(10, 1020, 190, 160, [16, 0, 0, 16]);
   ctx.fill();
   ctx.stroke();
 
-  // Engine exhaust flame plumes
   const flamePulse = Math.sin(time / 100) * 8;
   const flameGradTop = ctx.createLinearGradient(10, 500, -50 - flamePulse, 500);
   flameGradTop.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
@@ -306,104 +353,111 @@ function drawShipHull(ctx: CanvasRenderingContext2D, time: number) {
   ctx.closePath();
   ctx.fill();
 
-  const flameGradBottom = ctx.createLinearGradient(10, 1220, -50 - flamePulse, 1220);
+  const flameGradBottom = ctx.createLinearGradient(10, 1100, -50 - flamePulse, 1100);
   flameGradBottom.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
   flameGradBottom.addColorStop(0.5, 'rgba(2, 132, 199, 0.4)');
   flameGradBottom.addColorStop(1, 'transparent');
   ctx.fillStyle = flameGradBottom;
   ctx.beginPath();
-  ctx.moveTo(10, 1160);
-  ctx.lineTo(-40 - flamePulse, 1220);
-  ctx.lineTo(10, 1280);
+  ctx.moveTo(10, 1040);
+  ctx.lineTo(-40 - flamePulse, 1100);
+  ctx.lineTo(10, 1160);
   ctx.closePath();
   ctx.fill();
 
-  // Weapons Cannon Barrels outside the ship hull (Top-Right)
   ctx.fillStyle = '#334155';
-  ctx.fillRect(1980, 460, 70, 14);
-  ctx.fillRect(1980, 530, 70, 14);
+  ctx.fillRect(1980, 280, 70, 14);
+  ctx.fillRect(1980, 350, 70, 14);
   ctx.strokeStyle = '#0f172a';
   ctx.lineWidth = 3;
-  ctx.strokeRect(1980, 460, 70, 14);
-  ctx.strokeRect(1980, 530, 70, 14);
+  ctx.strokeRect(1980, 280, 70, 14);
+  ctx.strokeRect(1980, 350, 70, 14);
 
-  // Periodic laser blast from Weapons
   const laserCycle = Math.floor(time / 2000) % 2 === 0;
   if (laserCycle && (time % 2000) < 300) {
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(2050, 467);
-    ctx.lineTo(2350, 467);
-    ctx.moveTo(2050, 537);
-    ctx.lineTo(2350, 537);
+    ctx.moveTo(2050, 287);
+    ctx.lineTo(2350, 287);
+    ctx.moveTo(2050, 357);
+    ctx.lineTo(2350, 357);
     ctx.stroke();
-    drawGlowCircle(ctx, 2050, 467, 10, 'rgba(239, 68, 68, 0.8)', 15);
-    drawGlowCircle(ctx, 2050, 537, 10, 'rgba(239, 68, 68, 0.8)', 15);
+    drawGlowCircle(ctx, 2050, 287, 10, 'rgba(239, 68, 68, 0.8)', 15);
+    drawGlowCircle(ctx, 2050, 357, 10, 'rgba(239, 68, 68, 0.8)', 15);
   }
 }
 
 // Floors & Room Panels
+
 function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabotage?: ActiveSabotage | null) {
-  // 1. Draw Hallway connections from CORRIDORS
   for (const corr of CORRIDORS) {
     ctx.fillStyle = '#1c2638';
     ctx.fillRect(corr.x, corr.y, corr.width, corr.height);
 
-    // Floor tile grid on corridors
     ctx.strokeStyle = '#151e2d';
     ctx.lineWidth = 1.5;
     const tileSize = 50;
 
     for (let x = corr.x; x < corr.x + corr.width; x += tileSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, corr.y);
-      ctx.lineTo(x, corr.y + corr.height);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, corr.y); ctx.lineTo(x, corr.y + corr.height); ctx.stroke();
     }
     for (let y = corr.y; y < corr.y + corr.height; y += tileSize) {
-      ctx.beginPath();
-      ctx.moveTo(corr.x, y);
-      ctx.lineTo(corr.x + corr.width, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(corr.x, y); ctx.lineTo(corr.x + corr.width, y); ctx.stroke();
     }
-
-    // Corridor centerline guidance lights
     ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
     if (corr.width >= corr.height) {
-      // Horizontal corridor light strip
       ctx.fillRect(corr.x + 10, corr.y + corr.height / 2 - 2, corr.width - 20, 4);
     } else {
-      // Vertical corridor light strip
       ctx.fillRect(corr.x + corr.width / 2 - 2, corr.y + 10, 4, corr.height - 20);
     }
   }
 
-  // 2. Render Rooms
+  const roomColors: Record<string, string> = {
+    cafeteria: '#263040',
+    weapons: '#2a3545',
+    o2: '#1e3328',
+    navigation: '#1a2842',
+    shields: '#1e2d3d',
+    communications: '#252d38',
+    storage: '#2a3040',
+    admin: '#242c38',
+    electrical: '#181c24',
+    lower_engine: '#222c3a',
+    upper_engine: '#222c3a',
+    security: '#1c2630',
+    reactor: '#281a1e',
+    medbay: '#1a2a26',
+  };
+
   for (const room of ROOMS) {
-    // Room base floor
-    ctx.fillStyle = '#212d40';
+    const rName = room.name.toLowerCase().replace(/\s+/g, '_');
+    ctx.fillStyle = roomColors[rName] || '#212d40';
     ctx.fillRect(room.x, room.y, room.width, room.height);
 
-    // Floor tile grid (metallic floor plates)
     ctx.strokeStyle = '#172233';
     ctx.lineWidth = 2;
     const tileSize = 60;
-
-    for (let x = room.x; x < room.x + room.width; x += tileSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, room.y);
-      ctx.lineTo(x, room.y + room.height);
-      ctx.stroke();
+    
+    if (rName === 'admin') {
+      for (let x = room.x; x < room.x + room.width; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x+40, room.y+40); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x+40, room.y); ctx.lineTo(x, room.y+40); ctx.stroke();
+      }
+    } else if (rName.includes('engine')) {
+       ctx.strokeStyle = '#111';
+       for (let x = room.x; x < room.x + room.width; x += 20) {
+          ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x, room.y+room.height); ctx.stroke();
+       }
+    } else {
+      for (let x = room.x; x < room.x + room.width; x += tileSize) {
+        ctx.beginPath(); ctx.moveTo(x, room.y); ctx.lineTo(x, room.y + room.height); ctx.stroke();
+      }
+      for (let y = room.y; y < room.y + room.height; y += tileSize) {
+        ctx.beginPath(); ctx.moveTo(room.x, y); ctx.lineTo(room.x + room.width, y); ctx.stroke();
+      }
     }
-    for (let y = room.y; y < room.y + room.height; y += tileSize) {
-      ctx.beginPath();
-      ctx.moveTo(room.x, y);
-      ctx.lineTo(room.x + room.width, y);
-      ctx.stroke();
-    }
 
-    // Floor Plate Rivets
     ctx.fillStyle = '#111927';
     for (let x = room.x + 8; x < room.x + room.width; x += tileSize) {
       for (let y = room.y + 8; y < room.y + room.height; y += tileSize) {
@@ -411,7 +465,6 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
       }
     }
 
-    // Room Label on the floor (authentic subtle stencil typography)
     ctx.save();
     ctx.font = '900 24px ui-monospace, SFMono-Regular, "Courier New", monospace';
     ctx.fillStyle = 'rgba(148, 163, 184, 0.22)';
@@ -423,8 +476,8 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
 }
 
 // Hazard stripes & room decals
+
 function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
-  // Function to draw hazard tape (Yellow & Black diagonal stripes)
   const drawHazardTape = (x: number, y: number, w: number, h: number) => {
     ctx.save();
     ctx.fillStyle = '#f59e0b';
@@ -444,557 +497,240 @@ function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
     ctx.restore();
   };
 
-  // Hazard stripes at Reactor entrances
   drawHazardTape(100, 640, 90, 14);
   drawHazardTape(100, 1046, 90, 14);
-
-  // Hazard stripes at Electrical entrance
   drawHazardTape(640, 940, 90, 14);
-
-  // Hazard stripes at Storage thresholds
   drawHazardTape(920, 1040, 100, 14);
   drawHazardTape(1300, 1040, 100, 14);
-
-  // Hazard stripes at Shields
   drawHazardTape(1600, 1080, 90, 14);
-
-  // Hazard stripes at Navigation
   drawHazardTape(1960, 680, 80, 14);
+  drawHazardTape(620, 640, 90, 14);
+  drawHazardTape(620, 360, 90, 14);
+  
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.font = '24px sans-serif';
+  ctx.fillText('EXIT ->', 1400, 1000);
+  ctx.fillText('<- REACTOR', 500, 950);
+  
+  ctx.fillStyle = '#f59e0b';
+  ctx.fillRect(150, 650, 40, 40);
+  ctx.fillStyle = '#000';
+  ctx.fillText('!', 165, 675);
 }
 
 // Detailed Room Objects (Cafeteria, Reactor, Engines, Admin, Medbay, Shields, etc.)
+
 function drawDetailedRoomObjects(ctx: CanvasRenderingContext2D, time: number, localPlayer: Player) {
-  // ----------------------------------------------------
-  // 1. CAFETERIA: Iconic Large Table & Observation Windows
-  // ----------------------------------------------------
-  // Observation Window looking into space at top of Cafeteria
-  ctx.fillStyle = '#040714';
-  ctx.fillRect(1080, 430, 240, 20);
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(1080, 430, 240, 20);
-  // Window Glass shine
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.2)';
-  ctx.fillRect(1080, 430, 240, 20);
-
-  // Drop shadow of cafeteria table
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.beginPath();
-  ctx.ellipse(1200, 648, 98, 56, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Outer Table Surface (metallic dark slate)
-  ctx.fillStyle = '#334155';
-  ctx.beginPath();
-  ctx.ellipse(1200, 640, 95, 52, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 5;
-  ctx.stroke();
-
-  // Inner Table Inset (cyan-tinted metallic core)
-  ctx.fillStyle = '#1e293b';
-  ctx.beginPath();
-  ctx.ellipse(1200, 640, 75, 38, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // 10 Round Metal Chairs around Cafeteria Table
+  // CAFETERIA
+  ctx.fillStyle = '#040714'; ctx.fillRect(1080, 430, 240, 20); ctx.strokeStyle = '#38bdf8'; ctx.strokeRect(1080, 430, 240, 20);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.beginPath(); ctx.ellipse(1200, 648, 98, 56, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(1200, 640, 95, 52, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#0f172a'; ctx.stroke();
+  ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.ellipse(1200, 640, 75, 38, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#475569'; ctx.stroke();
   for (let i = 0; i < 10; i++) {
     const angle = (i / 10) * Math.PI * 2;
-    const cx = 1200 + Math.cos(angle) * 122;
-    const cy = 640 + Math.sin(angle) * 68;
-
-    // Chair shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 4, 13, 11, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Chair cushion
-    ctx.fillStyle = '#475569';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    const cx = 1200 + Math.cos(angle) * 122; const cy = 640 + Math.sin(angle) * 68;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; ctx.beginPath(); ctx.ellipse(cx, cy + 4, 13, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#0f172a'; ctx.stroke();
   }
-
-  // 2 Side Cafeteria Dining Tables
   const drawSideTable = (tx: number, ty: number) => {
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.roundRect(tx - 30, ty - 18, 60, 36, 10);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-    // Drinks / plates
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(tx - 12, ty - 4, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#38bdf8';
-    ctx.beginPath();
-    ctx.arc(tx + 10, ty + 2, 6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.roundRect(tx - 30, ty - 18, 60, 36, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(tx - 12, ty - 4, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(tx + 10, ty + 2, 6, 0, Math.PI * 2); ctx.fill();
   };
-  drawSideTable(980, 560);
-  drawSideTable(1360, 560);
+  drawSideTable(980, 560); drawSideTable(1360, 560);
+  ctx.fillStyle = '#991b1b'; ctx.fillRect(1000, 420, 30, 40); ctx.fillStyle = '#064e3b'; ctx.fillRect(1040, 420, 30, 40);
+  ctx.fillStyle = '#fff'; ctx.fillRect(1005, 425, 20, 15); ctx.fillRect(1045, 425, 20, 15);
+  ctx.fillStyle = '#475569'; ctx.fillRect(920, 600, 30, 100);
+  ctx.fillStyle = '#64748b'; ctx.fillRect(1450, 700, 20, 40);
 
-  // ----------------------------------------------------
-  // 2. REACTOR: Giant Pulsing Core & Manifolds
-  // ----------------------------------------------------
-  const reactorX = 250;
-  const reactorY = 840;
-
-  // Reactor Outer Chamber Housing
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(reactorX, reactorY, 78, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 7;
-  ctx.stroke();
-
-  // Pulsing Antimatter Core Glow
-  const reactorPulse = Math.sin(time / 250) * 0.2 + 0.8;
-  const coreGrad = ctx.createRadialGradient(reactorX, reactorY, 10, reactorX, reactorY, 68);
-  coreGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * reactorPulse})`);
-  coreGrad.addColorStop(0.6, `rgba(14, 165, 233, ${0.65 * reactorPulse})`);
-  coreGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
-  ctx.fillStyle = coreGrad;
-  ctx.beginPath();
-  ctx.arc(reactorX, reactorY, 68, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Rotating Containment Ring
-  ctx.save();
-  ctx.translate(reactorX, reactorY);
-  ctx.rotate(time / 1200);
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, 42, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = '#e0f2fe';
-  ctx.fillRect(-6, -45, 12, 6);
-  ctx.fillRect(-6, 39, 12, 6);
-  ctx.restore();
-
-  // High-Voltage Cooling Pipes
-  ctx.strokeStyle = '#0284c7';
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(reactorX, reactorY - 78);
-  ctx.lineTo(reactorX, 640);
-  ctx.moveTo(reactorX, reactorY + 78);
-  ctx.lineTo(reactorX, 1040);
-  ctx.stroke();
-
-  // ----------------------------------------------------
-  // 3. UPPER & LOWER ENGINES: Plasma Turbines
-  // ----------------------------------------------------
-  const drawEngineTurbine = (x: number, y: number) => {
-    // Outer Engine Housing
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.roundRect(x - 35, y - 40, 70, 80, 16);
-    ctx.fill();
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 5;
-    ctx.stroke();
-
-    // Plasma Chamber Glow
-    const enginePulse = Math.sin(time / 200 + x) * 0.2 + 0.8;
-    const plasmaGrad = ctx.createRadialGradient(x, y, 5, x, y, 30);
-    plasmaGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * enginePulse})`);
-    plasmaGrad.addColorStop(0.7, `rgba(2, 132, 199, ${0.55 * enginePulse})`);
-    plasmaGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = plasmaGrad;
-    ctx.beginPath();
-    ctx.arc(x, y, 30, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Spinning steel turbine fins
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 3.5;
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
-      const rotAngle = a + (time / 600);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(rotAngle) * 26, y + Math.sin(rotAngle) * 26);
-      ctx.stroke();
-    }
-  };
-
-  drawEngineTurbine(435, 500); // Upper Engine
-  drawEngineTurbine(435, 1240); // Lower Engine
-
-  // ----------------------------------------------------
-  // 4. MEDBAY: Holographic Medical Scanner Platform & Beds
-  // ----------------------------------------------------
-  const scanPadX = 860;
-  const scanPadY = 500;
-
-  // Platform Base
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.ellipse(scanPadX, scanPadY, 44, 26, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#059669';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // Animated Concentric Hologram Rings & Scanning Laser
-  const medbayPulse = Math.sin(time / 250) * 0.25 + 0.75;
-  ctx.strokeStyle = `rgba(52, 211, 153, ${medbayPulse})`;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.ellipse(scanPadX, scanPadY, 34, 18, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(scanPadX, scanPadY, 18, 10, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Vertical Holo-Light Scanning Column
-  const scanGrad = ctx.createLinearGradient(scanPadX, scanPadY - 40, scanPadX, scanPadY);
-  scanGrad.addColorStop(0, 'rgba(52, 211, 153, 0)');
-  scanGrad.addColorStop(1, `rgba(52, 211, 153, ${0.35 * medbayPulse})`);
-  ctx.fillStyle = scanGrad;
-  ctx.fillRect(scanPadX - 25, scanPadY - 40, 50, 40);
-
-  // 2 Hospital Examination Beds
-  const beds = [
-    { x: 670, y: 380 },
-    { x: 740, y: 380 },
-  ];
-  for (const bed of beds) {
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(bed.x - 16, bed.y - 20, 32, 40);
-    ctx.fillStyle = '#0284c7'; // Blue sheets
-    ctx.fillRect(bed.x - 14, bed.y - 8, 28, 26);
-    ctx.fillStyle = '#f8fafc'; // Pillow
-    ctx.fillRect(bed.x - 12, bed.y - 18, 24, 8);
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(bed.x - 16, bed.y - 20, 32, 40);
+  // WEAPONS
+  ctx.fillStyle = '#040714'; ctx.fillRect(1800, 340, 160, 20);
+  for(let i=0; i<30; i++) {
+     ctx.fillStyle = '#fff'; ctx.fillRect(1800+Math.random()*160, 340+Math.random()*20, 2, 2);
   }
+  ctx.fillStyle = '#475569'; ctx.fillRect(1600, 400, 20, 60);
+  ctx.fillStyle = '#000'; ctx.fillRect(1605, 405, 10, 50);
+  
+  const wepX = 1780; const wepY = 480;
+  ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(wepX, wepY - 26, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(wepX, wepY + 26, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)'; ctx.beginPath(); ctx.arc(wepX + 54, wepY, 24, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(wepX + 30, wepY); ctx.lineTo(wepX + 78, wepY); ctx.moveTo(wepX + 54, wepY - 24); ctx.lineTo(wepX + 54, wepY + 24); ctx.stroke();
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(1740, 450, 20, 60); ctx.fillStyle = '#10b981'; ctx.fillRect(1742, 460, 16, 16);
 
-  // ----------------------------------------------------
-  // 5. ADMIN: Large Oval Map Table & Status Display
-  // ----------------------------------------------------
-  const adminTableX = 1650;
-  const adminTableY = 1020;
-
-  // Admin Table Shadow & Body
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-  ctx.beginPath();
-  ctx.ellipse(adminTableX, adminTableY + 6, 68, 36, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#334155';
-  ctx.beginPath();
-  ctx.ellipse(adminTableX, adminTableY, 65, 34, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 4.5;
-  ctx.stroke();
-
-  // Table screen (Green radar map)
-  ctx.fillStyle = '#064e3b';
-  ctx.beginPath();
-  ctx.ellipse(adminTableX, adminTableY, 48, 22, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#10b981';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Radar sweep line on admin table
-  const radarAngle = (time / 1000) % (Math.PI * 2);
-  ctx.strokeStyle = '#34d399';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(adminTableX, adminTableY);
-  ctx.lineTo(adminTableX + Math.cos(radarAngle) * 44, adminTableY + Math.sin(radarAngle) * 18);
-  ctx.stroke();
-
-  // ----------------------------------------------------
-  // 6. SHIELDS: Glowing Hexagonal Energy Shield Core
-  // ----------------------------------------------------
-  const shieldsX = 1780;
-  const shieldsY = 1305;
-
-  // Shield Hexagon Base
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  for (let a = 0; a < 6; a++) {
-    const angle = (a / 6) * Math.PI * 2;
-    const hx = shieldsX + Math.cos(angle) * 44;
-    const hy = shieldsY + Math.sin(angle) * 44;
-    if (a === 0) ctx.moveTo(hx, hy);
-    else ctx.lineTo(hx, hy);
+  // O2
+  const o2X = 1660; const o2Y = 780;
+  ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(o2X, o2Y + 10, 50, 30, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.25)'; ctx.beginPath(); ctx.arc(o2X, o2Y, 44, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(o2X - 10, o2Y + 5, 15, 0, Math.PI * 2); ctx.arc(o2X + 10, o2Y + 4, 18, 0, Math.PI * 2); ctx.arc(o2X, o2Y - 10, 16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#451a03'; ctx.fillRect(1550, 700, 16, 16); ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(1558, 695, 8, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#451a03'; ctx.fillRect(1580, 700, 16, 16); ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(1588, 695, 8, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#64748b'; ctx.fillRect(1750, 680, 40, 20);
+  
+  // NAVIGATION
+  const navX = 2140; const navY = 840;
+  ctx.fillStyle = '#040714'; ctx.fillRect(2300, 700, 40, 200);
+  for(let i=0; i<30; i++) {
+     ctx.fillStyle = '#fff'; ctx.fillRect(2300+Math.random()*40, 700+Math.random()*200, 2, 2);
   }
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  // Glowing Shield Panels
-  const shieldGlow = Math.sin(time / 350) * 0.2 + 0.8;
-  ctx.fillStyle = `rgba(56, 189, 248, ${0.45 * shieldGlow})`;
-  ctx.beginPath();
-  for (let a = 0; a < 6; a++) {
-    const angle = (a / 6) * Math.PI * 2;
-    const hx = shieldsX + Math.cos(angle) * 32;
-    const hy = shieldsY + Math.sin(angle) * 32;
-    if (a === 0) ctx.moveTo(hx, hy);
-    else ctx.lineTo(hx, hy);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // ----------------------------------------------------
-  // 7. WEAPONS: Dual Laser Gunner Control Pods
-  // ----------------------------------------------------
-  const wepX = 1780;
-  const wepY = 480;
-  // Gunner Chair 1
-  ctx.fillStyle = '#475569';
-  ctx.beginPath();
-  ctx.arc(wepX, wepY - 26, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Gunner Chair 2
-  ctx.fillStyle = '#475569';
-  ctx.beginPath();
-  ctx.arc(wepX, wepY + 26, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Holographic targeting reticle HUD
-  ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(wepX + 54, wepY, 24, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(wepX + 30, wepY);
-  ctx.lineTo(wepX + 78, wepY);
-  ctx.moveTo(wepX + 54, wepY - 24);
-  ctx.lineTo(wepX + 54, wepY + 24);
-  ctx.stroke();
-
-  // ----------------------------------------------------
-  // 8. O2: Oxygen Greenhouse Plant in Glass Dome
-  // ----------------------------------------------------
-  const o2X = 1660;
-  const o2Y = 780;
-  // Glass dome pedestal
-  ctx.fillStyle = '#334155';
-  ctx.beginPath();
-  ctx.ellipse(o2X, o2Y + 10, 30, 16, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Glass Dome (Greenhouse)
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-  ctx.beginPath();
-  ctx.arc(o2X, o2Y, 24, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(186, 230, 253, 0.8)';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Green space plant inside dome
-  ctx.fillStyle = '#22c55e';
-  ctx.beginPath();
-  ctx.arc(o2X - 5, o2Y + 3, 8, 0, Math.PI * 2);
-  ctx.arc(o2X + 6, o2Y + 2, 10, 0, Math.PI * 2);
-  ctx.arc(o2X, o2Y - 6, 9, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ----------------------------------------------------
-  // 9. NAVIGATION: Holographic Galaxy Star Globe & Steering Wheels
-  // ----------------------------------------------------
-  const navX = 2140;
-  const navY = 840;
-
-  // Steering Consoles
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(navX + 40, navY - 45, 26, 90);
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(navX + 40, navY - 45, 26, 90);
-
-  // Rotating Celestial Galaxy Hologram
+  ctx.fillStyle = '#334155'; ctx.fillRect(navX + 40, navY - 45, 26, 90); ctx.strokeRect(navX + 40, navY - 45, 26, 90);
+  ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.ellipse(2250, 750, 16, 24, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(2250, 950, 16, 24, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#475569'; ctx.fillRect(2200, 700, 30, 300);
   const galaxyPulse = Math.sin(time / 300) * 0.2 + 0.8;
-  ctx.strokeStyle = `rgba(168, 85, 247, ${galaxyPulse})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(navX - 20, navY, 26, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.strokeStyle = `rgba(168, 85, 247, ${galaxyPulse})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(navX - 20, navY, 46, 0, Math.PI * 2); ctx.stroke();
+  ctx.save(); ctx.translate(navX - 20, navY); ctx.rotate(time / 800); ctx.beginPath(); ctx.ellipse(0, 0, 44, 18, 0, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#c084fc'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.restore();
 
-  // Galaxy Rings
-  ctx.save();
-  ctx.translate(navX - 20, navY);
-  ctx.rotate(time / 800);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 24, 8, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = '#c084fc';
-  ctx.beginPath();
-  ctx.arc(0, 0, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // ----------------------------------------------------
-  // 10. STORAGE: Cargo Crates & Fuel Jerry Cans
-  // ----------------------------------------------------
-  const crates = [
-    { x: 1000, y: 1100, w: 44, h: 44, col: '#78350f' },
-    { x: 1050, y: 1100, w: 40, h: 40, col: '#92400e' },
-    { x: 1020, y: 1148, w: 48, h: 44, col: '#78350f' },
-    { x: 1240, y: 1360, w: 42, h: 42, col: '#475569' },
-  ];
-  for (const c of crates) {
-    ctx.fillStyle = c.col;
-    ctx.fillRect(c.x, c.y, c.w, c.h);
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 3.5;
-    ctx.strokeRect(c.x, c.y, c.w, c.h);
-    // Crate cross-brace
-    ctx.beginPath();
-    ctx.moveTo(c.x, c.y);
-    ctx.lineTo(c.x + c.w, c.y + c.h);
-    ctx.moveTo(c.x + c.w, c.y);
-    ctx.lineTo(c.x, c.y + c.h);
-    ctx.stroke();
+  // SHIELDS
+  const shieldsX = 1780; const shieldsY = 1305;
+  ctx.fillStyle = '#0f172a'; ctx.beginPath();
+  for (let a = 0; a < 6; a++) {
+    const angle = (a / 6) * Math.PI * 2; const hx = shieldsX + Math.cos(angle) * 44; const hy = shieldsY + Math.sin(angle) * 44;
+    if (a === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  const shieldGlow = Math.sin(time / 350) * 0.2 + 0.8;
+  ctx.fillStyle = `rgba(56, 189, 248, ${0.45 * shieldGlow})`; ctx.beginPath();
+  for (let a = 0; a < 6; a++) {
+    const angle = (a / 6) * Math.PI * 2; const hx = shieldsX + Math.cos(angle) * 32; const hy = shieldsY + Math.sin(angle) * 32;
+    if (a === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+  }
+  ctx.closePath(); ctx.fill();
+  for(let i=0; i<3; i++) {
+    for(let j=0; j<3; j++) {
+       ctx.fillStyle = `rgba(56, 189, 248, ${0.45 * shieldGlow})`;
+       ctx.fillRect(1650 + i*20, 1200 + j*20, 15, 15);
+    }
   }
 
-  // Fuel Jerry Cans (Gas refill task station)
-  ctx.fillStyle = '#eab308';
-  ctx.fillRect(1160, 1370, 22, 28);
-  ctx.fillRect(1186, 1370, 22, 28);
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(1160, 1370, 22, 28);
-  ctx.strokeRect(1186, 1370, 22, 28);
-
-  // ----------------------------------------------------
-  // 11. ELECTRICAL: High-Voltage Transformers & Electric Sparks
-  // ----------------------------------------------------
-  const elecX = 730;
-  const elecY = 1040;
-  // Generator block
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(elecX, elecY, 65, 75);
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(elecX, elecY, 65, 75);
-
-  // Electrical warning sign
-  ctx.fillStyle = '#f59e0b';
-  ctx.beginPath();
-  ctx.moveTo(elecX + 32, elecY + 12);
-  ctx.lineTo(elecX + 52, elecY + 44);
-  ctx.lineTo(elecX + 12, elecY + 44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('⚡', elecX + 32, elecY + 38);
-
-  // Dynamic Electric Sparks on Transformer
-  if (Math.sin(time / 80) > 0.6) {
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(elecX + 32, elecY + 54);
-    ctx.lineTo(elecX + 42, elecY + 60);
-    ctx.lineTo(elecX + 28, elecY + 66);
-    ctx.lineTo(elecX + 36, elecY + 70);
-    ctx.stroke();
-    drawGlowCircle(ctx, elecX + 32, elecY + 62, 6, 'rgba(56, 189, 248, 0.8)', 12);
-  }
-
-  // ----------------------------------------------------
-  // 12. SECURITY: CCTV Surveillance Monitors
-  // ----------------------------------------------------
-  const secX = 760;
-  const secY = 740;
-  // Desk
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(secX - 40, secY, 80, 30);
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3.5;
-  ctx.strokeRect(secX - 40, secY, 80, 30);
-
-  // 4 Security Screens
-  const screens = [
-    { x: secX - 34, y: secY - 24, w: 28, h: 18 },
-    { x: secX + 6, y: secY - 24, w: 28, h: 18 },
-    { x: secX - 34, y: secY - 46, w: 28, h: 18 },
-    { x: secX + 6, y: secY - 46, w: 28, h: 18 },
-  ];
-
-  for (let sIdx = 0; sIdx < screens.length; sIdx++) {
-    const scr = screens[sIdx];
-    ctx.fillStyle = '#064e3b';
-    ctx.fillRect(scr.x, scr.y, scr.w, scr.h);
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(scr.x, scr.y, scr.w, scr.h);
-
-    // Static scanlines
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.fillRect(scr.x, scr.y + ((time / 30 + sIdx * 5) % scr.h), scr.w, 2);
-  }
-
-  // Flashing Red Recording Dot
-  if (Math.sin(time / 200) > 0) {
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(secX + 30, secY - 50, 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ----------------------------------------------------
-  // 13. COMMUNICATIONS: Oscilloscope Sound Waves & Antenna
-  // ----------------------------------------------------
-  const commsX = 1430;
-  const commsY = 1350;
-  // Radio Console
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(commsX - 35, commsY - 25, 70, 50);
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 3.5;
-  ctx.strokeRect(commsX - 35, commsY - 25, 70, 50);
-
-  // Green Oscilloscope Screen
-  ctx.fillStyle = '#022c22';
-  ctx.fillRect(commsX - 28, commsY - 18, 56, 22);
-  ctx.strokeStyle = '#10b981';
-  ctx.lineWidth = 2;
+  // COMMUNICATIONS
+  const commsX = 1430; const commsY = 1350;
+  ctx.fillStyle = '#334155'; ctx.fillRect(commsX - 35, commsY - 25, 70, 50); ctx.strokeRect(commsX - 35, commsY - 25, 70, 50);
+  ctx.fillStyle = '#022c22'; ctx.fillRect(commsX - 28, commsY - 18, 56, 22); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2;
   ctx.beginPath();
   for (let ox = 0; ox < 50; ox += 5) {
     const waveY = commsY - 7 + Math.sin((time / 150) + ox * 0.3) * 6;
-    if (ox === 0) ctx.moveTo(commsX - 25 + ox, waveY);
-    else ctx.lineTo(commsX - 25 + ox, waveY);
+    if (ox === 0) ctx.moveTo(commsX - 25 + ox, waveY); else ctx.lineTo(commsX - 25 + ox, waveY);
   }
   ctx.stroke();
+  ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.arc(1350, 1280, 20, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = '#064e3b'; ctx.fillRect(commsX - 40, commsY - 60, 30, 20); ctx.fillRect(commsX, commsY - 60, 30, 20);
+
+  // STORAGE
+  const crates = [
+    { x: 1000, y: 1100, w: 44, h: 44, col: '#78350f' }, { x: 1050, y: 1100, w: 40, h: 40, col: '#92400e' },
+    { x: 1020, y: 1148, w: 48, h: 44, col: '#78350f' }, { x: 1240, y: 1360, w: 42, h: 42, col: '#475569' },
+    { x: 1000, y: 1200, w: 40, h: 40, col: '#78350f' }, { x: 1050, y: 1200, w: 40, h: 40, col: '#92400e' },
+    { x: 1100, y: 1100, w: 44, h: 44, col: '#475569' }, { x: 1150, y: 1100, w: 44, h: 44, col: '#475569' },
+  ];
+  for (const c of crates) {
+    ctx.fillStyle = c.col; ctx.fillRect(c.x, c.y, c.w, c.h); ctx.strokeStyle = '#0f172a'; ctx.strokeRect(c.x, c.y, c.w, c.h);
+    ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + c.w, c.y + c.h); ctx.moveTo(c.x + c.w, c.y); ctx.lineTo(c.x, c.y + c.h); ctx.stroke();
+  }
+  ctx.fillStyle = '#eab308'; ctx.fillRect(1160, 1370, 22, 28); ctx.fillRect(1186, 1370, 22, 28); ctx.strokeRect(1160, 1370, 22, 28); ctx.strokeRect(1186, 1370, 22, 28);
+  ctx.fillStyle = '#f59e0b'; ctx.fillRect(1100, 1300, 60, 40); ctx.fillRect(1160, 1320, 20, 10);
+  ctx.fillStyle = '#334155'; ctx.fillRect(950, 1400, 60, 40);
+
+  // ADMIN
+  const adminTableX = 1650; const adminTableY = 1020;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY + 6, 68, 36, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY, 65, 34, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#064e3b'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY, 48, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  const radarAngle = (time / 1000) % (Math.PI * 2);
+  ctx.strokeStyle = '#34d399'; ctx.beginPath(); ctx.moveTo(adminTableX, adminTableY); ctx.lineTo(adminTableX + Math.cos(radarAngle) * 44, adminTableY + Math.sin(radarAngle) * 18); ctx.stroke();
+  ctx.strokeStyle = '#10b981'; ctx.beginPath(); ctx.ellipse(adminTableX, adminTableY, 30, 10, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(1580, 1020, 10, 0, Math.PI*2); ctx.arc(1720, 1020, 10, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1e293b'; ctx.fillRect(1780, 940, 20, 30);
+
+  // ELECTRICAL
+  const elecX = 730; const elecY = 1040;
+  ctx.fillStyle = '#334155'; ctx.fillRect(elecX, elecY, 65, 75); ctx.strokeRect(elecX, elecY, 65, 75);
+  ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.moveTo(elecX + 32, elecY + 12); ctx.lineTo(elecX + 52, elecY + 44); ctx.lineTo(elecX + 12, elecY + 44); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#000000'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚡', elecX + 32, elecY + 38);
+  if (Math.sin(time / 80) > 0.6) {
+    ctx.strokeStyle = '#38bdf8'; ctx.beginPath(); ctx.moveTo(elecX + 32, elecY + 54); ctx.lineTo(elecX + 42, elecY + 60); ctx.lineTo(elecX + 28, elecY + 66); ctx.lineTo(elecX + 36, elecY + 70); ctx.stroke();
+    drawGlowCircle(ctx, elecX + 32, elecY + 62, 6, 'rgba(56, 189, 248, 0.8)', 12);
+  }
+  for(let i=0; i<5; i++) {
+      ctx.fillStyle = '#475569'; ctx.fillRect(630 + i*40, 940, 30, 40);
+  }
+  ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(630, 980); ctx.quadraticCurveTo(700, 1000, 750, 1040); ctx.stroke();
+  ctx.strokeStyle = '#3b82f6'; ctx.beginPath(); ctx.moveTo(650, 980); ctx.quadraticCurveTo(720, 1020, 770, 1040); ctx.stroke();
+  if(Math.random() > 0.8) {
+      ctx.fillStyle = 'rgba(255, 255, 100, 0.2)'; ctx.fillRect(620, 920, 300, 340);
+  }
+
+  // ENGINES
+  const drawEngineTurbine = (x: number, y: number) => {
+    ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.roundRect(x - 35, y - 40, 70, 80, 16); ctx.fill(); ctx.stroke();
+    const enginePulse = Math.sin(time / 200 + x) * 0.2 + 0.8;
+    const plasmaGrad = ctx.createRadialGradient(x, y, 5, x, y, 30);
+    plasmaGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * enginePulse})`); plasmaGrad.addColorStop(0.7, `rgba(2, 132, 199, ${0.55 * enginePulse})`); plasmaGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = plasmaGrad; ctx.beginPath(); ctx.arc(x, y, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#64748b';
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+      const rotAngle = a + (time / 600);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(rotAngle) * 26, y + Math.sin(rotAngle) * 26); ctx.stroke();
+    }
+    ctx.strokeStyle = '#64748b'; ctx.beginPath(); ctx.moveTo(x, y-40); ctx.lineTo(x, y-80); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y-60, 10, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(x, y-60); ctx.lineTo(x+8, y-60); ctx.stroke();
+    ctx.fillStyle = '#475569'; ctx.fillRect(x-60, y-20, 20, 40);
+  };
+  drawEngineTurbine(435, 500); drawEngineTurbine(435, 1240);
+
+  // SECURITY
+  const secX = 760; const secY = 740;
+  ctx.fillStyle = '#334155'; ctx.fillRect(secX - 40, secY, 80, 30); ctx.strokeRect(secX - 40, secY, 80, 30);
+  const screens = [
+    { x: secX - 34, y: secY - 24, w: 28, h: 18 }, { x: secX + 6, y: secY - 24, w: 28, h: 18 },
+    { x: secX - 34, y: secY - 46, w: 28, h: 18 }, { x: secX + 6, y: secY - 46, w: 28, h: 18 },
+  ];
+  for (let sIdx = 0; sIdx < screens.length; sIdx++) {
+    const scr = screens[sIdx];
+    ctx.fillStyle = '#064e3b'; ctx.fillRect(scr.x, scr.y, scr.w, scr.h); ctx.strokeRect(scr.x, scr.y, scr.w, scr.h);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; ctx.fillRect(scr.x, scr.y + ((time / 30 + sIdx * 5) % scr.h), scr.w, 2);
+  }
+  if (Math.sin(time / 200) > 0) { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(secX + 30, secY - 50, 4, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(secX, secY+40, 15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#cbd5e1'; ctx.fillRect(secX-10, secY+5, 20, 10);
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(secX-30, secY+5, 8, 8);
+  ctx.fillStyle = '#334155'; ctx.fillRect(secX-80, secY-40, 30, 70);
+
+  // REACTOR
+  const reactorX = 250; const reactorY = 840;
+  ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.arc(reactorX, reactorY, 78, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  const reactorPulse = Math.sin(time / 250) * 0.2 + 0.8;
+  const coreGrad = ctx.createRadialGradient(reactorX, reactorY, 10, reactorX, reactorY, 68);
+  coreGrad.addColorStop(0, `rgba(56, 189, 248, ${0.95 * reactorPulse})`); coreGrad.addColorStop(0.6, `rgba(14, 165, 233, ${0.65 * reactorPulse})`); coreGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
+  ctx.fillStyle = coreGrad; ctx.beginPath(); ctx.arc(reactorX, reactorY, 68, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(reactorX, reactorY); ctx.rotate(time / 1200); ctx.strokeStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(0, 0, 42, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#e0f2fe'; ctx.fillRect(-6, -45, 12, 6); ctx.fillRect(-6, 39, 12, 6); ctx.restore();
+  ctx.strokeStyle = '#0284c7'; ctx.beginPath(); ctx.moveTo(reactorX, reactorY - 78); ctx.lineTo(reactorX, 640); ctx.moveTo(reactorX, reactorY + 78); ctx.lineTo(reactorX, 1040); ctx.stroke();
+  ctx.fillStyle = '#475569'; ctx.fillRect(150, 680, 30, 40); ctx.fillRect(150, 980, 30, 40);
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(155, 690, 20, 20); ctx.fillRect(155, 990, 20, 20);
+  ctx.fillStyle = '#f59e0b'; ctx.fillRect(350, 800, 40, 40); ctx.fillStyle = '#000'; ctx.fillText('☢', 370, 825);
+  ctx.fillStyle = '#334155'; ctx.fillRect(180, 780, 10, 120); ctx.fillRect(310, 780, 10, 120);
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(200, 640, 20, 30);
+
+  // MEDBAY
+  const scanPadX = 860; const scanPadY = 500;
+  ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 44, 26, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  const medbayPulse = Math.sin(time / 250) * 0.25 + 0.75;
+  ctx.strokeStyle = `rgba(52, 211, 153, ${medbayPulse})`; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 34, 18, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 18, 10, 0, 0, Math.PI * 2); ctx.stroke();
+  const scanGrad = ctx.createLinearGradient(scanPadX, scanPadY - 40, scanPadX, scanPadY);
+  scanGrad.addColorStop(0, 'rgba(52, 211, 153, 0)'); scanGrad.addColorStop(1, `rgba(52, 211, 153, ${0.35 * medbayPulse})`);
+  ctx.fillStyle = scanGrad; ctx.fillRect(scanPadX - 25, scanPadY - 40, 50, 40);
+  const beds = [{ x: 670, y: 380 }, { x: 740, y: 380 }];
+  for (const bed of beds) {
+    ctx.fillStyle = '#334155'; ctx.fillRect(bed.x - 16, bed.y - 20, 32, 40); ctx.fillStyle = '#0284c7'; ctx.fillRect(bed.x - 14, bed.y - 8, 28, 26);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(bed.x - 12, bed.y - 18, 24, 8); ctx.strokeRect(bed.x - 16, bed.y - 20, 32, 40);
+  }
+  ctx.strokeStyle = '#22c55e'; ctx.beginPath(); ctx.moveTo(900, 380); ctx.lineTo(900, 420); ctx.moveTo(920, 380); ctx.lineTo(920, 420); ctx.stroke();
+  ctx.fillStyle = '#e2e8f0'; ctx.fillRect(800, 380, 40, 20);
+  ctx.fillStyle = '#94a3b8'; ctx.fillRect(820, 480, 20, 20);
+  ctx.strokeStyle = '#cbd5e1'; ctx.beginPath(); ctx.moveTo(640, 360); ctx.lineTo(640, 420); ctx.stroke(); ctx.fillStyle='#38bdf8'; ctx.fillRect(635, 370, 10, 15);
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(650, 440, 20, 15);
 }
 
 // Emergency Button in Cafeteria (Authentic red dome with glass lid)
@@ -1816,25 +1552,48 @@ function drawPlayerCanvasHat(ctx: CanvasRenderingContext2D, hat?: HatType, isGho
 }
 
 // Ship Walls & Structural Bulkheads (Solid barrier blocks)
-function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
 
+function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
   for (const wall of WALLS) {
-    // 1. Wall Drop Shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(wall.x, wall.y + 8, wall.width, wall.height);
 
-    // 2. Wall Main Face (Deep Navy-Slate: #1e293b)
     ctx.fillStyle = wall.isObstacle ? '#273549' : '#1e293b';
     ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
 
-    // 3. Wall Top Face / Rim Highlight (#334155 / #475569)
     ctx.fillStyle = wall.isObstacle ? '#3b4c63' : '#334155';
     ctx.fillRect(wall.x, wall.y, wall.width, Math.min(6, wall.height));
 
-    // 4. Wall Dark Border Stroke (#0f172a)
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 3.5;
     ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+
+    if (wall.width > 20 && wall.height > 20) {
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(wall.x + wall.width / 2, wall.y + 6);
+      ctx.lineTo(wall.x + wall.width / 2, wall.y + wall.height);
+      ctx.stroke();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(wall.x + 4, wall.y + 10, 2, 2);
+      ctx.fillRect(wall.x + wall.width - 6, wall.y + 10, 2, 2);
+      ctx.fillRect(wall.x + 4, wall.y + wall.height - 6, 2, 2);
+      ctx.fillRect(wall.x + wall.width - 6, wall.y + wall.height - 6, 2, 2);
+      
+      if (wall.width > 50) {
+         ctx.fillStyle = '#111';
+         ctx.fillRect(wall.x + 20, wall.y + 10, 20, 10);
+         ctx.strokeStyle = '#333';
+         ctx.beginPath();
+         for(let i=0; i<4; i++) {
+            ctx.moveTo(wall.x + 20, wall.y + 12 + i*2);
+            ctx.lineTo(wall.x + 40, wall.y + 12 + i*2);
+         }
+         ctx.stroke();
+      }
+    }
   }
 }
 
