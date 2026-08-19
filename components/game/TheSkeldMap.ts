@@ -1000,7 +1000,7 @@ function drawDetailedRoomObjects(ctx: CanvasRenderingContext2D, time: number, lo
 // Emergency Button in Cafeteria (Authentic red dome with glass lid)
 function drawEmergencyButton(ctx: CanvasRenderingContext2D, localPlayer: Player, time: number) {
   const dist = Math.hypot(localPlayer.x - EMERGENCY_BUTTON_POS.x, localPlayer.y - EMERGENCY_BUTTON_POS.y);
-  const isNear = dist < 90 && localPlayer.isAlive && !localPlayer.inVent;
+  const isNear = dist < 140 && localPlayer.isAlive && !localPlayer.inVent;
 
   const bx = EMERGENCY_BUTTON_POS.x;
   const by = EMERGENCY_BUTTON_POS.y;

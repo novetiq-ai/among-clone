@@ -319,7 +319,12 @@ export function GameCanvas({
   // Handle USE action (Task / Sabotage Fix / Emergency Button / CCTV / Admin Table)
   const handleUseAction = useCallback(() => {
     if (nearbyEmergencyButton) {
+      if (emergencyCooldown > 0) {
+        sound.playErrorBuzz();
+        return;
+      }
       onEmergencyMeeting();
+      setEmergencyCooldown(15);
     } else if (nearbyFixSabotage) {
       if (nearbyFixSabotage === 'lights') {
         setActiveTask({ id: 'fix_lights', type: 'fix_lights', name: 'Lichter reparieren', room: 'Electrical', x: 670, y: 960 });
@@ -335,7 +340,7 @@ export function GameCanvas({
     } else if (nearbyTask) {
       setActiveTask(nearbyTask);
     }
-  }, [nearbyEmergencyButton, onEmergencyMeeting, nearbyFixSabotage, onFixSabotage, nearbySecurityDesk, handleToggleCCTV, nearbyAdminTable, nearbyTask]);
+  }, [nearbyEmergencyButton, emergencyCooldown, onEmergencyMeeting, nearbyFixSabotage, onFixSabotage, nearbySecurityDesk, handleToggleCCTV, nearbyAdminTable, nearbyTask]);
 
   // Keyboard Event Listeners
   useEffect(() => {
@@ -593,15 +598,14 @@ export function GameCanvas({
           const curDeadBodies = deadBodiesRef.current;
           const curLockedDoors = lockedDoorsRef.current;
 
-          // Emergency Button Proximity in Cafeteria (Blocked during active Sabotage Crisis or on cooldown)
+          // Emergency Button Proximity in Cafeteria (Blocked during active Sabotage Crisis)
           const distToEmergency = Math.hypot(currentX - EMERGENCY_BUTTON_POS.x, currentY - EMERGENCY_BUTTON_POS.y);
           const hasEmergencyMeetingsLeft = (localP.emergencyMeetingsLeft ?? curSettings.emergencyMeetings) > 0;
           setNearbyEmergencyButton(
-            distToEmergency < 90 &&
+            distToEmergency < 140 &&
             localP.isAlive &&
             !localP.inVent &&
             !curActiveSab &&
-            emergencyCooldown === 0 &&
             hasEmergencyMeetingsLeft
           );
 
@@ -1094,9 +1098,13 @@ export function GameCanvas({
               handleUseAction();
             }
           }}
-          disabled={!nearbyTask && !nearbyEmergencyButton && !nearbySecurityDesk && !nearbyAdminTable && !nearbyFixSabotage}
+          disabled={!nearbyTask && !nearbyEmergencyButton && !nearbySecurityDesk && !nearbyAdminTable && !nearbyFixSabotage || (nearbyEmergencyButton && emergencyCooldown > 0)}
           className={`w-16 h-16 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation pointer-events-auto ${
-            nearbyEmergencyButton || nearbyFixSabotage
+            nearbyEmergencyButton
+              ? emergencyCooldown > 0
+                ? 'bg-amber-900/60 border-amber-500 text-amber-300 shadow-amber-950/60 opacity-80 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-500 border-red-300 text-white shadow-red-950/60 hover:scale-105 active:scale-90 animate-bounce'
+              : nearbyFixSabotage
               ? 'bg-red-600 hover:bg-red-500 border-red-300 text-white shadow-red-950/60 hover:scale-105 active:scale-90 animate-bounce'
               : nearbySecurityDesk
               ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-300 text-white shadow-emerald-950/60 hover:scale-105 active:scale-90'
@@ -1109,8 +1117,10 @@ export function GameCanvas({
         >
           {nearbyEmergencyButton ? (
             <>
-              <Megaphone className="w-6 h-6 sm:w-8 sm:h-8" />
-              <span className="text-[9px] sm:text-[10px]">MEETING</span>
+              <Megaphone className={`w-6 h-6 sm:w-8 sm:h-8 ${emergencyCooldown === 0 ? 'animate-bounce' : ''}`} />
+              <span className="text-[9px] sm:text-[10px]">
+                {emergencyCooldown > 0 ? `${emergencyCooldown}s` : 'MEETING'}
+              </span>
             </>
           ) : nearbyFixSabotage ? (
             <>
