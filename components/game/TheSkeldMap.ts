@@ -174,9 +174,15 @@ export function drawTheSkeld(
   // 14. Draw Solid Ship Walls & Structural Bulkheads (drawn over players for realistic 2.5D occlusion)
   drawWallsAndBulkheads(ctx, time);
 
-  // 15. Dynamic Vision & Lighting (Fog of War / Flashlight Vignette / Alarm Strobes)
+  // 15. Draw Glowing World-Space Sabotage Beacons (Sonar waves at terminals)
+  drawSabotageBeacons(ctx, activeSabotage, time);
+
+  // 16. Dynamic Vision & Lighting (Fog of War / Flashlight Vignette / Alarm Strobes)
   ctx.restore(); // Restore camera translation to screen space
   drawDynamicLighting(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
+
+  // 17. Screen-Space Directional Sabotage Navigation Arrows (Point towards O2, Reactor, Lights terminals)
+  drawSabotageDirectionalArrows(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
 }
 
 // Deep Space starfield with nebulae, floating asteroids & twinkling stars
@@ -1884,4 +1890,220 @@ function drawDynamicLighting(
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+}
+
+interface SabotageTarget {
+  name: string;
+  room: string;
+  x: number;
+  y: number;
+}
+
+function getSabotageTargets(activeSabotage?: ActiveSabotage | null): SabotageTarget[] {
+  if (!activeSabotage) return [];
+  switch (activeSabotage.type) {
+    case 'o2':
+      return [
+        { name: 'O2: O2-RAUM', room: 'O2', x: 1740, y: 800 },
+        { name: 'O2: ADMIN', room: 'Admin', x: 1620, y: 1080 },
+      ];
+    case 'reactor':
+      return [
+        { name: 'REAKTOR (OBEN)', room: 'Reactor', x: 140, y: 620 },
+        { name: 'REAKTOR (UNTEN)', room: 'Reactor', x: 140, y: 820 },
+      ];
+    case 'lights':
+      return [
+        { name: 'ELEKTRIK (LICHTER)', room: 'Electrical', x: 670, y: 960 },
+      ];
+    case 'comms':
+      return [
+        { name: 'FUNKRAUM (COMMS)', room: 'Communications', x: 1480, y: 1400 },
+      ];
+    default:
+      return [];
+  }
+}
+
+// World-Space Glowing Sabotage Beacons (Drawn on the ship floor at repair terminals)
+function drawSabotageBeacons(
+  ctx: CanvasRenderingContext2D,
+  activeSabotage?: ActiveSabotage | null,
+  time = 0
+) {
+  const targets = getSabotageTargets(activeSabotage);
+  if (targets.length === 0) return;
+
+  const isCritical = activeSabotage?.type === 'o2' || activeSabotage?.type === 'reactor';
+  const pulse = (Math.sin(time / 150) + 1) * 0.5;
+
+  ctx.save();
+  for (const t of targets) {
+    // Expanding sonar pulse waves
+    const ringRadius1 = 15 + ((time / 20) % 45);
+    const ringOpacity1 = Math.max(0, 1 - ringRadius1 / 60);
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, ringRadius1, 0, Math.PI * 2);
+    ctx.strokeStyle = isCritical
+      ? `rgba(239, 68, 68, ${ringOpacity1 * 0.85})`
+      : `rgba(245, 158, 11, ${ringOpacity1 * 0.85})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    const ringRadius2 = 15 + (((time / 20) + 22.5) % 45);
+    const ringOpacity2 = Math.max(0, 1 - ringRadius2 / 60);
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, ringRadius2, 0, Math.PI * 2);
+    ctx.strokeStyle = isCritical
+      ? `rgba(239, 68, 68, ${ringOpacity2 * 0.85})`
+      : `rgba(245, 158, 11, ${ringOpacity2 * 0.85})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Central glowing beacon core
+    const coreGrad = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 28);
+    coreGrad.addColorStop(0, isCritical ? `rgba(239, 68, 68, ${0.7 + 0.3 * pulse})` : `rgba(245, 158, 11, ${0.7 + 0.3 * pulse})`);
+    coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Terminal Highlight Box
+    ctx.fillStyle = isCritical ? '#dc2626' : '#d97706';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 9 + pulse * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Screen-Space Directional Navigation Arrows (Authentic Among Us Sabotage Indicators)
+function drawSabotageDirectionalArrows(
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  localPlayer: Player,
+  activeSabotage?: ActiveSabotage | null,
+  time = 0
+) {
+  if (!activeSabotage || !localPlayer.isAlive) return;
+  const targets = getSabotageTargets(activeSabotage);
+  if (targets.length === 0) return;
+
+  const isCritical = activeSabotage.type === 'o2' || activeSabotage.type === 'reactor';
+  const pulse = (Math.sin(time / 140) + 1) * 0.5;
+
+  const cx = canvasWidth / 2;
+  const cy = canvasHeight / 2;
+  const marginX = 75;
+  const marginY = 75;
+  const maxDx = canvasWidth / 2 - marginX;
+  const maxDy = canvasHeight / 2 - marginY;
+
+  ctx.save();
+
+  for (const t of targets) {
+    const dx = t.x - localPlayer.x;
+    const dy = t.y - localPlayer.y;
+    const dist = Math.hypot(dx, dy);
+
+    // If player is already within 75px of console, no arrow needed (beacon is clearly visible)
+    if (dist < 75) continue;
+
+    const angle = Math.atan2(dy, dx);
+
+    // Calculate clamped screen edge coordinates along the direction ray
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    const scaleX = cosA !== 0 ? maxDx / Math.abs(cosA) : Infinity;
+    const scaleY = sinA !== 0 ? maxDy / Math.abs(sinA) : Infinity;
+    const edgeDist = Math.min(scaleX, scaleY);
+
+    // Check if target is inside screen bounds
+    let indicatorX: number;
+    let indicatorY: number;
+
+    if (Math.abs(dx) <= maxDx && Math.abs(dy) <= maxDy) {
+      indicatorX = cx + dx;
+      indicatorY = cy + dy;
+    } else {
+      indicatorX = cx + cosA * edgeDist;
+      indicatorY = cy + sinA * edgeDist;
+    }
+
+    // Draw pulsating Directional Chevron Arrow
+    ctx.save();
+    ctx.translate(indicatorX, indicatorY);
+
+    const arrowScale = 1 + 0.12 * pulse;
+    ctx.scale(arrowScale, arrowScale);
+    ctx.rotate(angle);
+
+    ctx.shadowColor = isCritical ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.85)';
+    ctx.shadowBlur = 14 + pulse * 6;
+
+    // Chevron Arrow Path
+    ctx.beginPath();
+    ctx.moveTo(18, 0); // Tip
+    ctx.lineTo(-12, -15); // Top back corner
+    ctx.lineTo(-6, 0); // Inner back indent
+    ctx.lineTo(-12, 15); // Bottom back corner
+    ctx.closePath();
+
+    ctx.fillStyle = isCritical ? '#ef4444' : '#fbbf24';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Draw Informational Room & Distance Tag
+    ctx.save();
+    ctx.shadowBlur = 0;
+    const distanceMeters = Math.max(1, Math.round(dist / 24));
+    const labelText = `${t.name} (${distanceMeters}m)`;
+
+    ctx.font = 'bold 11px ui-monospace, SFMono-Regular, monospace';
+    const textMetrics = ctx.measureText(labelText);
+    const tagW = textMetrics.width + 20;
+    const tagH = 22;
+
+    let tagX = indicatorX - tagW / 2;
+    let tagY = indicatorY + 22;
+
+    // Clamp tag inside canvas
+    tagX = Math.max(10, Math.min(canvasWidth - tagW - 10, tagX));
+    tagY = Math.max(30, Math.min(canvasHeight - tagH - 10, tagY));
+
+    // Tag background
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+    ctx.beginPath();
+    ctx.roundRect(tagX, tagY, tagW, tagH, 6);
+    ctx.fill();
+
+    ctx.strokeStyle = isCritical ? '#ef4444' : '#f59e0b';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Flashing warning icon dot
+    ctx.fillStyle = isCritical ? '#ef4444' : '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(tagX + 10, tagY + tagH / 2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tag text
+    ctx.fillStyle = '#f8fafc';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labelText, tagX + 18, tagY + tagH / 2 + 1);
+
+    ctx.restore();
+  }
+
+  ctx.restore();
 }

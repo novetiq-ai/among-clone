@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Player, PLAYER_COLORS } from '@/types/game';
+import { Player, PLAYER_COLORS, ActiveSabotage } from '@/types/game';
 import {
   ROOMS,
   CORRIDORS,
@@ -10,14 +10,15 @@ import {
   EMERGENCY_BUTTON_POS,
   getCurrentRoomName,
 } from '@/lib/map-data';
-import { Map as MapIcon, X, Navigation2, Megaphone, Skull, Compass, Zap } from 'lucide-react';
+import { Map as MapIcon, X, Navigation2, Megaphone, Skull, Compass, Zap, Flame, AlertTriangle } from 'lucide-react';
 
 interface SkeldMinimapModalProps {
   localPlayer: Player;
+  activeSabotage?: ActiveSabotage | null;
   onClose: () => void;
 }
 
-export function SkeldMinimapModal({ localPlayer, onClose }: SkeldMinimapModalProps) {
+export function SkeldMinimapModal({ localPlayer, activeSabotage, onClose }: SkeldMinimapModalProps) {
   const currentRoomName = getCurrentRoomName(localPlayer.x, localPlayer.y);
   const playerColor = PLAYER_COLORS.find((c) => c.id === localPlayer.color) || PLAYER_COLORS[0];
 
@@ -297,7 +298,82 @@ export function SkeldMinimapModal({ localPlayer, onClose }: SkeldMinimapModalPro
               );
             })}
 
-            {/* 7. Player Location Marker (Authentic Crewmate Icon + Radar Ping Ring) */}
+            {/* 7. Active Sabotage Emergency Beacons on Radar */}
+            {activeSabotage && (
+              <g>
+                {(activeSabotage.type === 'o2'
+                  ? [
+                      { name: 'O2-RAUM', x: 1740, y: 800 },
+                      { name: 'ADMIN', x: 1620, y: 1080 },
+                    ]
+                  : activeSabotage.type === 'reactor'
+                  ? [
+                      { name: 'REAKTOR (OBEN)', x: 140, y: 620 },
+                      { name: 'REAKTOR (UNTEN)', x: 140, y: 820 },
+                    ]
+                  : activeSabotage.type === 'lights'
+                  ? [{ name: 'ELEKTRIK', x: 670, y: 960 }]
+                  : activeSabotage.type === 'comms'
+                  ? [{ name: 'FUNKRAUM', x: 1480, y: 1400 }]
+                  : []
+                ).map((sabTarget, idx) => (
+                  <g key={`sab-map-${idx}`}>
+                    {/* Flashing Hazard Ping Waves */}
+                    <circle
+                      cx={sabTarget.x}
+                      cy={sabTarget.y}
+                      r="80"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="8"
+                      opacity="0.6"
+                    />
+                    <circle
+                      cx={sabTarget.x}
+                      cy={sabTarget.y}
+                      r="40"
+                      fill="#ef4444"
+                      stroke="#ffffff"
+                      strokeWidth="6"
+                    />
+                    <text
+                      x={sabTarget.x}
+                      y={sabTarget.y + 11}
+                      fill="#ffffff"
+                      fontSize="28"
+                      fontWeight="900"
+                      fontFamily="monospace"
+                      textAnchor="middle"
+                    >
+                      ⚠️
+                    </text>
+                    <rect
+                      x={sabTarget.x - 75}
+                      y={sabTarget.y - 75}
+                      width="150"
+                      height="26"
+                      rx="6"
+                      fill="#7f1d1d"
+                      stroke="#ef4444"
+                      strokeWidth="3"
+                    />
+                    <text
+                      x={sabTarget.x}
+                      y={sabTarget.y - 58}
+                      fill="#ffffff"
+                      fontSize="13"
+                      fontWeight="900"
+                      fontFamily="monospace"
+                      textAnchor="middle"
+                    >
+                      {sabTarget.name}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            )}
+
+            {/* 8. Player Location Marker (Authentic Crewmate Icon + Radar Ping Ring) */}
             <g transform={`translate(${localPlayer.x}, ${localPlayer.y})`}>
               {/* Radar Ping Wave */}
               <circle

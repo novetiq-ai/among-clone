@@ -1125,6 +1125,7 @@ export function GameCanvas({
       {showMinimap && (
         <SkeldMinimapModal
           localPlayer={localPlayer}
+          activeSabotage={activeSabotage}
           onClose={() => setShowMinimap(false)}
         />
       )}
