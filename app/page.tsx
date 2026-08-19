@@ -35,6 +35,10 @@ function AmongUsApp() {
   const [isHost, setIsHost] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [localPlayerId, setLocalPlayerId] = useState('');
+  const localPlayerIdRef = useRef(localPlayerId);
+  useEffect(() => {
+    localPlayerIdRef.current = localPlayerId;
+  }, [localPlayerId]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -315,7 +319,14 @@ function AmongUsApp() {
           case 'REPORT_BODY':
           case 'EMERGENCY_MEETING': {
             if (newState.phase === 'playing') {
-              const reporter = newState.players[senderId] || (senderId === localPlayerId ? newState.players[localPlayerId] : null);
+              const currentLocalId = localPlayerIdRef.current || localPlayerId;
+              const senderKey = senderId || (msg as any).reporterId || currentLocalId;
+              const reporter =
+                newState.players[senderKey] ||
+                (currentLocalId ? newState.players[currentLocalId] : null) ||
+                Object.values(newState.players).find((p) => p.isAlive && !p.inVent) ||
+                Object.values(newState.players)[0];
+
               if (!reporter || !reporter.isAlive || reporter.inVent) return prevState;
 
               if (msg.type === 'EMERGENCY_MEETING') {
@@ -328,9 +339,12 @@ function AmongUsApp() {
                     emergencyMeetingsLeft: meetingsLeft - 1,
                   },
                 };
-              } else if (msg.type === 'REPORT_BODY' && msg.bodyId) {
-                const body = newState.deadBodies.find((b) => b.id === msg.bodyId && !b.reported);
-                if (!body) return prevState;
+              } else if (msg.type === 'REPORT_BODY') {
+                // Mark all dead bodies as reported
+                newState.deadBodies = newState.deadBodies.map((b) => ({
+                  ...b,
+                  reported: true,
+                }));
               }
 
               sound.playEmergencySiren();
@@ -1742,15 +1756,16 @@ function AmongUsApp() {
   };
 
   const handleKillPlayer = (targetId: string, x: number, y: number) => {
+    const currentId = localPlayerIdRef.current || localPlayerId;
     if (isHost) {
       handleHostNetworkMessage(
-        { type: 'KILL_PLAYER', killerId: localPlayerId, targetId, x, y },
-        localPlayerId
+        { type: 'KILL_PLAYER', killerId: currentId, targetId, x, y },
+        currentId
       );
     } else {
       networkRef.current?.sendToHost({
         type: 'KILL_PLAYER',
-        killerId: localPlayerId,
+        killerId: currentId,
         targetId,
         x,
         y,
@@ -1759,44 +1774,47 @@ function AmongUsApp() {
   };
 
   const handleReportBody = (bodyId?: string) => {
+    const currentId = localPlayerIdRef.current || localPlayerId;
     if (isHost) {
       handleHostNetworkMessage(
-        { type: 'REPORT_BODY', reporterId: localPlayerId, bodyId },
-        localPlayerId
+        { type: 'REPORT_BODY', reporterId: currentId, bodyId },
+        currentId
       );
     } else {
       networkRef.current?.sendToHost({
         type: 'REPORT_BODY',
-        reporterId: localPlayerId,
+        reporterId: currentId,
         bodyId,
       });
     }
   };
 
   const handleEmergencyMeeting = () => {
+    const currentId = localPlayerIdRef.current || localPlayerId;
     if (isHost) {
       handleHostNetworkMessage(
-        { type: 'EMERGENCY_MEETING', reporterId: localPlayerId },
-        localPlayerId
+        { type: 'EMERGENCY_MEETING', reporterId: currentId },
+        currentId
       );
     } else {
       networkRef.current?.sendToHost({
         type: 'EMERGENCY_MEETING',
-        reporterId: localPlayerId,
+        reporterId: currentId,
       });
     }
   };
 
   const handleCastVote = (targetId: string | 'skip') => {
+    const currentId = localPlayerIdRef.current || localPlayerId;
     if (isHost) {
       handleHostNetworkMessage(
-        { type: 'CAST_VOTE', voterId: localPlayerId, targetId },
-        localPlayerId
+        { type: 'CAST_VOTE', voterId: currentId, targetId },
+        currentId
       );
     } else {
       networkRef.current?.sendToHost({
         type: 'CAST_VOTE',
-        voterId: localPlayerId,
+        voterId: currentId,
         targetId,
       });
     }

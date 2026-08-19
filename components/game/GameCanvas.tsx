@@ -993,7 +993,7 @@ export function GameCanvas({
       )}
 
       {/* BOTTOM RIGHT: Action Buttons */}
-      <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 flex items-center gap-2 sm:gap-3 z-30 select-none touch-none">
+      <div className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 flex items-center gap-2 sm:gap-3 z-40 select-none pointer-events-auto">
         {/* Sabotage Button (Impostor only) */}
         {localPlayer.role === 'impostor' && localPlayer.isAlive && onTriggerSabotage && (
           <button
@@ -1028,9 +1028,19 @@ export function GameCanvas({
         {/* Report Button */}
         <button
           type="button"
-          onClick={() => nearbyDeadBody && onReportBody(nearbyDeadBody.id)}
+          onClick={() => {
+            if (nearbyDeadBody) {
+              onReportBody(nearbyDeadBody.id);
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (nearbyDeadBody) {
+              e.preventDefault();
+              onReportBody(nearbyDeadBody.id);
+            }
+          }}
           disabled={!nearbyDeadBody}
-          className={`w-14 h-14 sm:w-18 sm:h-18 rounded-2xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation ${
+          className={`w-14 h-14 sm:w-18 sm:h-18 rounded-2xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation pointer-events-auto ${
             nearbyDeadBody
               ? 'bg-amber-600 hover:bg-amber-500 border-amber-300 text-white shadow-amber-950/50 hover:scale-105 active:scale-90 animate-bounce'
               : 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-40 cursor-not-allowed'
