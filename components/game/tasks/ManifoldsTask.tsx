@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Check, ShieldAlert } from 'lucide-react';
+import { sound } from '@/lib/sound';
 
 interface ManifoldsTaskProps {
   onComplete: () => void;
@@ -27,16 +28,19 @@ export function ManifoldsTask({ onComplete, onClose }: ManifoldsTaskProps) {
 
   const handleClick = (num: number) => {
     if (num === nextExpected) {
+      sound.playButtonClick();
       const next = nextExpected + 1;
       setNextExpected(next);
       if (next > 10 && !hasCompletedRef.current) {
         hasCompletedRef.current = true;
+        sound.playTaskComplete();
         setTimeout(() => {
           onCompleteRef.current();
         }, 400);
       }
     } else {
       // Mistake! Reset back to 1 with a flash
+      sound.playErrorBuzz();
       setErrorFlash(true);
       setNextExpected(1);
       setTimeout(() => setErrorFlash(false), 400);

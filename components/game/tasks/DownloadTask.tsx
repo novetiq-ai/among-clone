@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, Check, HardDrive, Laptop } from 'lucide-react';
+import { sound } from '@/lib/sound';
 
 interface DownloadTaskProps {
   onComplete: () => void;
@@ -28,6 +29,7 @@ export function DownloadTask({ onComplete, onClose }: DownloadTaskProps) {
           clearInterval(interval);
           if (!hasCompletedRef.current) {
             hasCompletedRef.current = true;
+            sound.playTaskComplete();
             setTimeout(() => {
               onCompleteRef.current();
             }, 500);
@@ -42,6 +44,7 @@ export function DownloadTask({ onComplete, onClose }: DownloadTaskProps) {
   }, [downloading]);
 
   const handleStart = () => {
+    sound.playButtonClick();
     setDownloading(true);
   };
 

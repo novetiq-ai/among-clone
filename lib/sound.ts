@@ -426,6 +426,33 @@ class SoundEngine {
     }
   }
 
+  public playErrorBuzz() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.setValueAtTime(120, now + 0.1);
+
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } catch {
+      // Ignore audio error
+    }
+  }
+
   public playCameraClick() {
     if (this.isMuted) return;
     this.initCtx();
@@ -452,6 +479,33 @@ class SoundEngine {
       // Ignore audio error
     }
   }
+
+  public playCardSwipe() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.12);
+
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } catch {
+      // Ignore audio error
+    }
+  }
 }
 
 export const sound = new SoundEngine();
@@ -467,3 +521,5 @@ export const playSabotageAlarm = () => sound.playSabotageAlarm();
 export const playSwitchClick = () => sound.playSwitchClick();
 export const playDoorLock = () => sound.playDoorLock();
 export const playCameraClick = () => sound.playCameraClick();
+export const playErrorBuzz = () => sound.playErrorBuzz();
+export const playCardSwipe = () => sound.playCardSwipe();

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { CreditCard, Check, AlertTriangle } from 'lucide-react';
+import { sound } from '@/lib/sound';
 
 interface SwipeCardTaskProps {
   onComplete: () => void;
@@ -24,6 +25,7 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
 
   const handleTakeCard = () => {
     if (!cardTaken) {
+      sound.playButtonClick();
       setCardTaken(true);
       setSwipeStatus('idle');
     }
@@ -42,6 +44,7 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
     if (!cardTaken || swipeStatus === 'accepted') return;
     const now = typeof performance !== 'undefined' ? performance.now() : 0;
     startTimeRef.current = now;
+    sound.playCardSwipe();
     setSwipeStatus('swiping');
     updateSwipeProgress(e.clientX);
   };
@@ -60,18 +63,22 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
 
     if (swipeProgress < 75) {
       // Incomplete swipe
+      sound.playErrorBuzz();
       setSwipeStatus('too_slow');
       setSwipeProgress(0);
     } else if (duration < 350) {
       // Too fast
+      sound.playErrorBuzz();
       setSwipeStatus('too_fast');
       setSwipeProgress(0);
     } else if (duration > 1400) {
       // Too slow
+      sound.playErrorBuzz();
       setSwipeStatus('too_slow');
       setSwipeProgress(0);
     } else {
       // Accepted!
+      sound.playTaskComplete();
       setSwipeStatus('accepted');
       setSwipeProgress(100);
       if (!hasCompletedRef.current) {

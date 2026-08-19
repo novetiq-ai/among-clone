@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Zap, Check } from 'lucide-react';
+import { sound } from '@/lib/sound';
 
 interface DivertPowerTaskProps {
   onComplete: () => void;
@@ -24,8 +25,10 @@ export function DivertPowerTask({ onComplete, onClose }: DivertPowerTaskProps) {
     setSliderValue(val);
     if (val >= 95 && !isDone) {
       setIsDone(true);
+      sound.playSwitchClick();
       if (!hasCompletedRef.current) {
         hasCompletedRef.current = true;
+        sound.playTaskComplete();
         setTimeout(() => {
           onCompleteRef.current();
         }, 400);

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Activity, Check } from 'lucide-react';
 import { PlayerColor } from '@/types/game';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
+import { sound } from '@/lib/sound';
 
 interface MedbayScanTaskProps {
   playerColor: PlayerColor;
@@ -29,6 +30,7 @@ export function MedbayScanTask({ playerColor, playerName, onComplete, onClose }:
           clearInterval(interval);
           if (!hasCompletedRef.current) {
             hasCompletedRef.current = true;
+            sound.playTaskComplete();
             setTimeout(() => {
               onCompleteRef.current();
             }, 500);
