@@ -675,13 +675,29 @@ function drawTaskStations(
   time: number
 ) {
   const isAlive = localPlayer.isAlive;
+  const assigned = localPlayer.assignedTasks || [];
+  const completed = localPlayer.completedTasks || [];
 
   for (const task of ALL_TASKS) {
+    const isMyTask = assigned.includes(task.id);
+    const isDone = completed.includes(task.id);
+
+    // Only highlight tasks that the local player actually HAS assigned and not yet done!
+    if (!isMyTask || isDone) {
+      // Draw unassigned or completed task station as a subtle unlit gray prop
+      ctx.save();
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath(); ctx.arc(task.x, task.y, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
     const dist = Math.hypot(localPlayer.x - task.x, localPlayer.y - task.y);
     const isNearby = dist <= 65;
 
     ctx.save();
-    // Glowing task pedestal indicator
+    // Glowing task pedestal indicator for assigned active tasks
     const pulse = Math.sin(time / 200) * 0.2 + 0.8;
     ctx.fillStyle = `rgba(234, 179, 8, ${0.35 * pulse})`;
     ctx.beginPath(); ctx.arc(task.x, task.y, 16, 0, Math.PI * 2); ctx.fill();

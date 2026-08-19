@@ -222,9 +222,15 @@ export const WALLS: WallBox[] = [
   { x: 0, y: 0, width: 40, height: MAP_HEIGHT }, // Far West space void
   { x: 2320, y: 0, width: 80, height: MAP_HEIGHT }, // Far East space void
 
-  // Outer Engine Pod Hull Cutouts
-  { x: 0, y: 260, width: 220, height: 360 }, // Upper left void
-  { x: 0, y: 1020, width: 220, height: 440 }, // Lower left void
+  // Outer Engine Pod & Cockpit Hull Cutouts
+  { x: 0, y: 260, width: 220, height: 360 }, // Upper left engine void
+  { x: 0, y: 1020, width: 220, height: 440 }, // Lower left engine void
+  { x: 560, y: 0, width: 400, height: 380 }, // Upper space void between Upper Engine & Cafeteria
+  { x: 1430, y: 0, width: 140, height: 350 }, // Upper space void between Cafeteria & Weapons
+  { x: 1830, y: 0, width: 500, height: 600 }, // Outer space void above Navigation
+  { x: 1920, y: 970, width: 400, height: 480 }, // Outer space void below Navigation
+  { x: 540, y: 1330, width: 400, height: 270 }, // Lower space void below Lower Hallway
+  { x: 1540, y: 1330, width: 400, height: 270 }, // Lower space void below Shields
 
   // ----------------------------------------------------
   // 1. CAFETERIA WALLS (x: 960..1440, y: 280..720)
@@ -335,7 +341,7 @@ export const WALLS: WallBox[] = [
   { x: 1320, y: 920, width: 40, height: 80 }, // Admin West Wall Bottom (opening y: 840..920)
 
   // ----------------------------------------------------
-  // 12. WEAPONS & O2 & EAST HALLWAY WALLS
+  // 12. WEAPONS & O2 & EAST HALLWAY & NAV CORRIDOR WALLS
   // ----------------------------------------------------
   { x: 1560, y: 250, width: 300, height: 40 }, // Weapons North Wall
   { x: 1830, y: 280, width: 40, height: 300 }, // Weapons East Wall
@@ -349,6 +355,12 @@ export const WALLS: WallBox[] = [
   { x: 1640, y: 580, width: 40, height: 50 }, // O2 East Wall Top
   { x: 1640, y: 710, width: 40, height: 60 }, // O2 East Wall Bottom (opening y: 630..710 to East Hub)
 
+  // East Corridor branches into Navigation
+  { x: 1730, y: 630, width: 240, height: 40 }, // North Wall of Nav Top Hallway (closes upper space gap!)
+  { x: 1730, y: 750, width: 240, height: 40 }, // South Wall of Nav Top Hallway
+  { x: 1730, y: 850, width: 240, height: 40 }, // North Wall of Nav Bottom Hallway
+  { x: 1730, y: 1010, width: 240, height: 40 }, // South Wall of Nav Bottom Hallway
+
   // ----------------------------------------------------
   // 13. NAVIGATION WALLS (x: 1960..2300, y: 620..940)
   // ----------------------------------------------------
@@ -356,8 +368,8 @@ export const WALLS: WallBox[] = [
   { x: 2280, y: 620, width: 40, height: 330 }, // Far East Pointed Cockpit Nose
   { x: 1960, y: 930, width: 350, height: 40 }, // South Wall
   { x: 1940, y: 620, width: 40, height: 50 }, // West Wall Top
-  { x: 1940, y: 750, width: 40, height: 60 }, // West Wall Middle (Top opening y: 670..750 from East Hub)
-  { x: 1940, y: 890, width: 40, height: 50 }, // West Wall Bottom (Bottom opening y: 810..890 from Shields)
+  { x: 1940, y: 750, width: 40, height: 110 }, // West Wall Middle (between top and bottom entrance)
+  { x: 1940, y: 890, width: 40, height: 50 }, // West Wall Bottom
 
   // ----------------------------------------------------
   // 14. SHIELDS & COMMS & STORAGE-SHIELDS HALLWAY WALLS
@@ -369,6 +381,7 @@ export const WALLS: WallBox[] = [
   { x: 1600, y: 1290, width: 330, height: 40 }, // Shields South Wall
   { x: 1600, y: 1040, width: 40, height: 70 }, // Shields West Wall Top
   { x: 1600, y: 1190, width: 40, height: 110 }, // Shields West Wall Bottom (opening y: 1110..1190 to Storage Hallway)
+  { x: 1280, y: 1070, width: 360, height: 40 }, // Storage-Shields Hallway North Wall
   { x: 1260, y: 1210, width: 100, height: 40 }, // Communications North Wall Left
   { x: 1440, y: 1210, width: 100, height: 40 }, // Communications North Wall Right (opening x: 1360..1440)
   { x: 1260, y: 1410, width: 280, height: 40 }, // Communications South Wall
@@ -403,7 +416,7 @@ export const WALLS: WallBox[] = [
   { x: 370, y: 1150, width: 60, height: 70, isObstacle: true },
 
   // --- MEDBAY ---
-  { x: 680, y: 530, width: 45, height: 180, isObstacle: true }, // Beds on West wall (leaves doorway x:750..830 wide open)
+  { x: 680, y: 530, width: 45, height: 180, isObstacle: true }, // Beds on West wall
   { x: 830, y: 650, width: 50, height: 30, isObstacle: true }, // Scan Pad
 
   // --- ADMIN ---
