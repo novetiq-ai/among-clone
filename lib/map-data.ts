@@ -403,8 +403,8 @@ export const WALLS: WallBox[] = [
   { x: 370, y: 1150, width: 60, height: 70, isObstacle: true },
 
   // --- MEDBAY ---
-  { x: 810, y: 650, width: 50, height: 30, isObstacle: true }, // Scan Pad
-  { x: 710, y: 530, width: 150, height: 40, isObstacle: true }, // Beds
+  { x: 680, y: 530, width: 45, height: 180, isObstacle: true }, // Beds on West wall (leaves doorway x:750..830 wide open)
+  { x: 830, y: 650, width: 50, height: 30, isObstacle: true }, // Scan Pad
 
   // --- ADMIN ---
   { x: 1440, y: 870, width: 90, height: 45, isObstacle: true }, // Hologram Map Table

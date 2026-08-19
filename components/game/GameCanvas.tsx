@@ -610,30 +610,29 @@ export function GameCanvas({
           );
 
           // Security CCTV Console Proximity
-          const distToSecurityDesk = Math.hypot(currentX - 740, currentY - 750);
+          const distToSecurityDesk = Math.hypot(currentX - 640, currentY - 760);
           setNearbySecurityDesk(distToSecurityDesk < 75 && localP.isAlive && !localP.inVent);
 
           // Admin Radar Table Proximity
-          const distToAdminTable = Math.hypot(currentX - 1650, currentY - 1040);
+          const distToAdminTable = Math.hypot(currentX - 1490, currentY - 890);
           setNearbyAdminTable(distToAdminTable < 80 && localP.isAlive && !localP.inVent);
 
           // Emergency Sabotage Fix Proximity (Both Consoles for O2 & Reactor)
           let nearbySab: SabotageType | null = null;
           if (curActiveSab && localP.isAlive && !localP.inVent) {
             if (curActiveSab.type === 'lights') {
-              const d = Math.hypot(currentX - 670, currentY - 960);
+              const d = Math.hypot(currentX - 760, currentY - 1080);
               if (d < 85) nearbySab = 'lights';
             } else if (curActiveSab.type === 'reactor') {
-              const dTop = Math.hypot(currentX - 140, currentY - 620);
-              const dBottom = Math.hypot(currentX - 140, currentY - 820);
-              const dCenter = Math.hypot(currentX - 140, currentY - 720);
-              if (dTop < 85 || dBottom < 85 || dCenter < 85) nearbySab = 'reactor';
+              const dTop = Math.hypot(currentX - 100, currentY - 720);
+              const dBottom = Math.hypot(currentX - 100, currentY - 920);
+              if (dTop < 85 || dBottom < 85) nearbySab = 'reactor';
             } else if (curActiveSab.type === 'o2') {
-              const dO2Room = Math.hypot(currentX - 1740, currentY - 800);
-              const dAdminRoom = Math.hypot(currentX - 1620, currentY - 1080);
+              const dO2Room = Math.hypot(currentX - 1520, currentY - 620);
+              const dAdminRoom = Math.hypot(currentX - 1590, currentY - 820);
               if (dO2Room < 85 || dAdminRoom < 85) nearbySab = 'o2';
             } else if (curActiveSab.type === 'comms') {
-              const d = Math.hypot(currentX - 1480, currentY - 1400);
+              const d = Math.hypot(currentX - 1450, currentY - 1350);
               if (d < 85) nearbySab = 'comms';
             }
           }

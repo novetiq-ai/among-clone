@@ -168,9 +168,10 @@ export function drawTheSkeld(
   // 15. Sabotage Beacons
   drawSabotageBeacons(ctx, activeSabotage, time);
 
-  // 16. Dynamic Lighting & Fog of War
+  // 16. Dynamic Lighting & Fog of War (Centered in world coordinates directly around player)
+  drawDynamicLighting(ctx, localPlayer, activeSabotage, time);
+
   ctx.restore();
-  drawDynamicLighting(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
 
   // 17. Screen-Space Directional Sabotage Arrows
   drawSabotageDirectionalArrows(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
@@ -605,12 +606,12 @@ function drawDetailedRoomObjects(ctx: CanvasRenderingContext2D, time: number, lo
   ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 40, 24, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   const medbayPulse = Math.sin(time / 250) * 0.25 + 0.75;
   ctx.strokeStyle = `rgba(52, 211, 153, ${medbayPulse})`; ctx.beginPath(); ctx.ellipse(scanPadX, scanPadY, 30, 16, 0, 0, Math.PI * 2); ctx.stroke();
-  // 3 Hospital Beds along North Wall
-  const beds = [{ x: 720, y: 540 }, { x: 780, y: 540 }, { x: 840, y: 540 }];
+  // 3 Hospital Beds along West Wall (leaves doorway completely open)
+  const beds = [{ x: 700, y: 560 }, { x: 700, y: 620 }, { x: 700, y: 680 }];
   for (const bed of beds) {
-    ctx.fillStyle = '#334155'; ctx.fillRect(bed.x - 16, bed.y - 20, 32, 40); ctx.strokeRect(bed.x - 16, bed.y - 20, 32, 40);
-    ctx.fillStyle = '#0284c7'; ctx.fillRect(bed.x - 14, bed.y - 8, 28, 26);
-    ctx.fillStyle = '#f8fafc'; ctx.fillRect(bed.x - 12, bed.y - 18, 24, 8);
+    ctx.fillStyle = '#334155'; ctx.fillRect(bed.x - 18, bed.y - 14, 36, 28); ctx.strokeRect(bed.x - 18, bed.y - 14, 36, 28);
+    ctx.fillStyle = '#0284c7'; ctx.fillRect(bed.x - 10, bed.y - 12, 26, 24);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(bed.x - 16, bed.y - 10, 8, 20);
   }
 }
 
@@ -931,8 +932,6 @@ function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
 
 function drawDynamicLighting(
   ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
   localPlayer: Player,
   activeSabotage: ActiveSabotage | null | undefined,
   time: number
@@ -942,32 +941,30 @@ function drawDynamicLighting(
 
   const isLightsOut = activeSabotage?.type === 'lights';
   const isImpostor = localPlayer.role === 'impostor';
-  const visionRadius = isImpostor ? 380 : isLightsOut ? 110 : 280;
-
-  const screenCenterX = canvasWidth / 2;
-  const screenCenterY = canvasHeight / 2;
+  const visionRadius = isImpostor ? 400 : isLightsOut ? 120 : 300;
 
   ctx.save();
+  // Draw gradient perfectly centered on player in world space
   const vignette = ctx.createRadialGradient(
-    screenCenterX,
-    screenCenterY,
-    visionRadius * 0.4,
-    screenCenterX,
-    screenCenterY,
-    visionRadius * 1.2
+    localPlayer.x,
+    localPlayer.y,
+    visionRadius * 0.45,
+    localPlayer.x,
+    localPlayer.y,
+    visionRadius * 1.25
   );
   vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vignette.addColorStop(0.7, 'rgba(0, 0, 0, 0.4)');
-  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.95)');
+  vignette.addColorStop(0.75, 'rgba(0, 0, 0, 0.45)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.96)');
 
   ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  ctx.fillRect(-2000, -2000, 6400, 5600);
 
   // Red Crisis Alarm Strobe during critical sabotage
   if (activeSabotage && (activeSabotage.type === 'reactor' || activeSabotage.type === 'o2')) {
     const strobe = (Math.sin(time / 180) + 1) / 2;
     ctx.fillStyle = `rgba(239, 68, 68, ${0.15 * strobe})`;
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    ctx.fillRect(-2000, -2000, 6400, 5600);
   }
   ctx.restore();
 }
