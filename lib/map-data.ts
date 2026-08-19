@@ -215,7 +215,7 @@ export const WALLS: WallBox[] = [
 
   // Outer Engine Pod Hull Cutouts
   { x: 0, y: 320, width: 240, height: 260 }, // Upper left void
-  { x: 0, y: 1080, width: 240, height: 400 }, // Lower left void
+  { x: 0, y: 1120, width: 220, height: 360 }, // Lower left void (clear of corr-react-lower)
 
   // ----------------------------------------------------
   // 1. CAFETERIA WALLS
@@ -312,9 +312,9 @@ export const WALLS: WallBox[] = [
   // ----------------------------------------------------
   // 11. REACTOR WALLS
   // ----------------------------------------------------
-  { x: 60, y: 580, width: 140, height: 40 }, // North Wall
+  { x: 60, y: 580, width: 140, height: 40 }, // North Wall (opening x: 200..340 to corr-react-upper)
   { x: 60, y: 580, width: 40, height: 500 }, // West Outer Hull
-  { x: 60, y: 1060, width: 140, height: 40 }, // South Wall
+  { x: 60, y: 1060, width: 140, height: 40 }, // South Wall (opening x: 200..340 to corr-react-lower)
   { x: 420, y: 580, width: 40, height: 140 }, // East Wall Top
   { x: 420, y: 840, width: 40, height: 240 }, // East Wall Bottom (opening y: 720..840)
 
@@ -325,13 +325,13 @@ export const WALLS: WallBox[] = [
   { x: 220, y: 300, width: 40, height: 260 }, // West Wall Top (opening y: 560..660)
   { x: 600, y: 300, width: 40, height: 140 }, // East Wall Top
   { x: 600, y: 560, width: 40, height: 120 }, // East Wall Bottom (opening y: 440..560)
-  { x: 260, y: 660, width: 340, height: 40 }, // South Wall
+  { x: 340, y: 620, width: 260, height: 40 }, // South Wall (opening x: 200..340 to Reactor)
 
   // ----------------------------------------------------
   // 13. LOWER ENGINE WALLS
   // ----------------------------------------------------
-  { x: 260, y: 1040, width: 340, height: 40 }, // North Wall
-  { x: 220, y: 1220, width: 40, height: 220 }, // West Wall Bottom (opening y: 1020..1220)
+  { x: 340, y: 1040, width: 260, height: 40 }, // North Wall (opening x: 200..340 to Reactor)
+  { x: 220, y: 1120, width: 40, height: 320 }, // West Wall Bottom (below corridor y: 1120..1440)
   { x: 600, y: 1040, width: 40, height: 100 }, // East Wall Top
   { x: 600, y: 1260, width: 40, height: 180 }, // East Wall Bottom (opening y: 1140..1260)
   { x: 260, y: 1420, width: 340, height: 40 }, // South Wall
@@ -484,11 +484,11 @@ export const LOCKED_DOOR_WALLS: Record<string, WallBox[]> = {
   ],
   upper_engine: [
     { x: 600, y: 440, width: 40, height: 120, isObstacle: true },
-    { x: 220, y: 560, width: 40, height: 100, isObstacle: true },
+    { x: 200, y: 580, width: 140, height: 40, isObstacle: true },
   ],
   lower_engine: [
     { x: 600, y: 1140, width: 40, height: 120, isObstacle: true },
-    { x: 220, y: 1020, width: 40, height: 120, isObstacle: true },
+    { x: 200, y: 1060, width: 140, height: 40, isObstacle: true },
   ],
 };
 

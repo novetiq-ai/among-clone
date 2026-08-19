@@ -497,8 +497,8 @@ function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
     ctx.restore();
   };
 
-  drawHazardTape(100, 640, 90, 14);
-  drawHazardTape(100, 1046, 90, 14);
+  drawHazardTape(200, 580, 140, 14); // Reactor Top ➔ Upper Engine
+  drawHazardTape(200, 1060, 140, 14); // Reactor Bottom ➔ Lower Engine
   drawHazardTape(640, 940, 90, 14);
   drawHazardTape(920, 1040, 100, 14);
   drawHazardTape(1300, 1040, 100, 14);
@@ -1007,11 +1007,11 @@ function drawLockedDoors(ctx: CanvasRenderingContext2D, lockedDoors: Record<stri
     ],
     upper_engine: [
       { x: 600, y: 440, w: 25, h: 120 },
-      { x: 220, y: 560, w: 25, h: 100 },
+      { x: 200, y: 580, w: 140, h: 25 },
     ],
     lower_engine: [
-      { x: 600, y: 1080, w: 25, h: 120 },
-      { x: 220, y: 980, w: 25, h: 100 },
+      { x: 600, y: 1140, w: 25, h: 120 },
+      { x: 200, y: 1060, w: 140, h: 25 },
     ],
   };
 
