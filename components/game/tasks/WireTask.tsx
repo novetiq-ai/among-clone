@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
+import { sound } from '@/lib/sound';
 
 interface WireTaskProps {
   onComplete: () => void;
@@ -39,6 +40,7 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
   useEffect(() => {
     if (isAllConnected && !hasCompletedRef.current) {
       hasCompletedRef.current = true;
+      sound.playTaskComplete();
       const timer = setTimeout(() => {
         onCompleteRef.current();
       }, 500);
@@ -59,6 +61,7 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
 
   const handlePointerDown = (leftId: string, e: React.PointerEvent) => {
     e.preventDefault();
+    sound.playButtonClick();
     setDraggingLeftId(leftId);
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
@@ -98,6 +101,7 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
     });
 
     if (connectedRightId) {
+      sound.playShieldClick();
       setConnections((prev) => ({
         ...prev,
         [draggingLeftId]: connectedRightId!,

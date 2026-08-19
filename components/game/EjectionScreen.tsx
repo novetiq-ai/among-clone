@@ -15,16 +15,22 @@ export function EjectionScreen({ data }: EjectionScreenProps) {
     wasTie,
     wasSkipped,
     remainingImpostors,
+    confirmEjects = true,
   } = data;
 
   const fullHeadline = wasTie
     ? 'Niemand wurde hinausgeworfen. (Gleichstand)'
     : wasSkipped
     ? 'Niemand wurde hinausgeworfen. (Übersprungen)'
+    : !confirmEjects
+    ? `${ejectedPlayerName || 'Jemand'} wurde hinausgeworfen.`
     : `${ejectedPlayerName || 'Jemand'} war ${ejectedPlayerRole === 'impostor' ? 'Ein Impostor.' : 'Nicht der Impostor.'}`;
 
-  const fullSubtext =
-    remainingImpostors === 1 ? '1 Impostor verbleibt.' : `${remainingImpostors} Impostors verbleiben.`;
+  const fullSubtext = !confirmEjects
+    ? ''
+    : remainingImpostors === 1
+    ? '1 Impostor verbleibt.'
+    : `${remainingImpostors} Impostors verbleiben.`;
 
   const [displayedHeadline, setDisplayedHeadline] = useState('');
   const [displayedSubtext, setDisplayedSubtext] = useState('');

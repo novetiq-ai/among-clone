@@ -141,6 +141,7 @@ export interface Player {
   inVent?: boolean;
   ventId?: string;
   isBot?: boolean;
+  emergencyMeetingsLeft?: number;
 }
 
 export interface DeadBody {
@@ -173,6 +174,7 @@ export interface GameSettings {
   votingTime: number; // in seconds
   totalTasksPerPlayer: number;
   anonymousVotes: boolean;
+  confirmEjects: boolean;
   botCount: number; // for solo / quick play
 }
 
@@ -186,6 +188,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   votingTime: 30,
   totalTasksPerPlayer: 4,
   anonymousVotes: false,
+  confirmEjects: true,
   botCount: 4,
 };
 
@@ -216,6 +219,7 @@ export interface EjectionData {
   wasTie?: boolean;
   wasSkipped?: boolean;
   remainingImpostors: number;
+  confirmEjects?: boolean;
 }
 
 export type SabotageType = 'lights' | 'reactor' | 'o2' | 'comms';

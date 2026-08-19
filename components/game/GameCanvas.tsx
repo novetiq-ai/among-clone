@@ -150,6 +150,7 @@ export function GameCanvas({
   // Cooldown timers
   const [killCooldown, setKillCooldown] = useState(settings.killCooldown);
   const [sabotageCooldown, setSabotageCooldown] = useState(15);
+  const [emergencyCooldown, setEmergencyCooldown] = useState(15);
 
   // Nearby Action Targets
   const [nearbyTask, setNearbyTask] = useState<TaskDefinition | null>(null);
@@ -164,17 +165,24 @@ export function GameCanvas({
   // Current room indicator computed from player coordinates
   const currentRoomName = getCurrentRoomName(localPlayer.x, localPlayer.y);
 
-  // Impostor kill cooldown interval
+  // Cooldown countdown interval
   useEffect(() => {
-    if (localPlayer.role !== 'impostor' || !localPlayer.isAlive) return;
-
     const timer = setInterval(() => {
       setKillCooldown((prev) => Math.max(0, prev - 1));
       setSabotageCooldown((prev) => Math.max(0, prev - 1));
+      setEmergencyCooldown((prev) => Math.max(0, prev - 1));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [localPlayer.role, localPlayer.isAlive]);
+  }, []);
+
+  // Reset kill cooldown and emergency cooldown when match starts or resumes
+  useEffect(() => {
+    if (localPlayer.role === 'impostor') {
+      setKillCooldown(settings.killCooldown);
+    }
+    setEmergencyCooldown(15);
+  }, [settings.killCooldown, localPlayer.role]);
 
   // Sync positions from props
   useEffect(() => {
@@ -451,13 +459,16 @@ export function GameCanvas({
           const currentX = posRef.current.x;
           const currentY = posRef.current.y;
 
-          // Emergency Button Proximity in Cafeteria (Blocked during active Sabotage Crisis!)
+          // Emergency Button Proximity in Cafeteria (Blocked during active Sabotage Crisis or on cooldown)
           const distToEmergency = Math.hypot(currentX - EMERGENCY_BUTTON_POS.x, currentY - EMERGENCY_BUTTON_POS.y);
+          const hasEmergencyMeetingsLeft = (localPlayer.emergencyMeetingsLeft ?? settings.emergencyMeetings) > 0;
           setNearbyEmergencyButton(
             distToEmergency < 90 &&
             localPlayer.isAlive &&
             !localPlayer.inVent &&
-            !activeSabotage
+            !activeSabotage &&
+            emergencyCooldown === 0 &&
+            hasEmergencyMeetingsLeft
           );
 
           // Security CCTV Console Proximity

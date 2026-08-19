@@ -88,12 +88,14 @@ function AmongUsApp() {
     }
 
     const playersList = Object.values(state.players);
+    if (playersList.length === 0) return {};
+
     const alivePlayers = playersList.filter((p) => p.isAlive);
     const aliveImpostors = alivePlayers.filter((p) => p.role === 'impostor');
     const aliveCrewmates = alivePlayers.filter((p) => p.role === 'crewmate');
 
     // 1. All Impostors Eliminated -> Crewmates Win
-    if (aliveImpostors.length === 0) {
+    if (aliveImpostors.length === 0 && playersList.some((p) => p.role === 'impostor')) {
       return {
         winner: 'crewmates',
         winReason: 'Alle Impostors wurden eliminiert!',
@@ -101,7 +103,7 @@ function AmongUsApp() {
     }
 
     // 2. Impostors Equal or Outnumber Crewmates -> Impostors Win
-    if (aliveImpostors.length >= aliveCrewmates.length) {
+    if (aliveImpostors.length > 0 && aliveImpostors.length >= aliveCrewmates.length) {
       return {
         winner: 'impostors',
         winReason: 'Die Impostors haben die Überhand gewonnen!',
@@ -300,8 +302,16 @@ function AmongUsApp() {
           case 'REPORT_BODY':
           case 'EMERGENCY_MEETING': {
             if (newState.phase === 'playing') {
-              sound.playEmergencySiren();
               const reporter = newState.players[msg.reporterId];
+              if (!reporter || !reporter.isAlive) return prevState;
+
+              if (msg.type === 'EMERGENCY_MEETING') {
+                const meetingsLeft = reporter.emergencyMeetingsLeft ?? newState.settings.emergencyMeetings;
+                if (meetingsLeft <= 0 || newState.activeSabotage) return prevState;
+                reporter.emergencyMeetingsLeft = meetingsLeft - 1;
+              }
+
+              sound.playEmergencySiren();
               newState.phase = 'meeting';
               newState.meetingReporterName = reporter?.name || 'Unbekannt';
               newState.meetingReporterColor = reporter?.color || 'red';
@@ -328,17 +338,18 @@ function AmongUsApp() {
           }
 
           case 'CAST_VOTE': {
-            if (newState.phase === 'meeting' && newState.players[msg.voterId]) {
+            const voter = newState.players[msg.voterId];
+            if (newState.phase === 'meeting' && newState.meetingPhase === 'voting' && voter && voter.isAlive && !voter.hasVoted) {
               sound.playButtonClick();
-              newState.players[msg.voterId].hasVoted = true;
-              newState.players[msg.voterId].votedFor = msg.targetId;
+              voter.hasVoted = true;
+              voter.votedFor = msg.targetId;
 
               // Check if all alive players have voted
               const alivePlayers = Object.values(newState.players).filter((p) => p.isAlive);
               const allVoted = alivePlayers.every((p) => p.hasVoted);
 
               if (allVoted) {
-                newState.meetingTimer = 2; // Jump to end of voting
+                newState.meetingTimer = 1; // Jump to results
               }
 
               networkRef.current?.broadcast({
@@ -642,13 +653,30 @@ function AmongUsApp() {
       net.onDisconnect((disconnectedPeerId) => {
         setGameState((prev) => {
           const updatedPlayers = { ...prev.players };
-          const leavingName = updatedPlayers[disconnectedPeerId]?.name || 'Ein Spieler';
+          const leavingPlayer = updatedPlayers[disconnectedPeerId];
+          const leavingName = leavingPlayer?.name || 'Ein Spieler';
           delete updatedPlayers[disconnectedPeerId];
 
-          const updatedState = {
+          let newTotalTasks = prev.totalTasksCount;
+          let newCompletedTasks = prev.completedTasksCount;
+          if (leavingPlayer && leavingPlayer.role !== 'impostor' && prev.phase !== 'lobby') {
+            newTotalTasks = Math.max(0, (newTotalTasks || 0) - leavingPlayer.assignedTasks.length);
+            newCompletedTasks = Math.max(0, (newCompletedTasks || 0) - leavingPlayer.completedTasks.length);
+          }
+
+          let updatedState: GameState = {
             ...prev,
             players: updatedPlayers,
+            totalTasksCount: newTotalTasks,
+            completedTasksCount: newCompletedTasks,
           };
+
+          const winCheck = checkWinConditions(updatedState);
+          if (winCheck.winner) {
+            updatedState.phase = 'game_over';
+            updatedState.winner = winCheck.winner;
+            updatedState.winReason = winCheck.winReason;
+          }
 
           net.broadcast({
             type: 'STATE_SYNC',
@@ -916,7 +944,7 @@ function AmongUsApp() {
   }, [isHost]);
 
   // Send Chat Message
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = (text: string, isDeadOnly?: boolean) => {
     const msg: ChatMessage = {
       id: `chat-${Date.now()}-${Math.random()}`,
       senderId: localPlayerId,
@@ -924,6 +952,7 @@ function AmongUsApp() {
       senderColor: localPlayer.color,
       text,
       timestamp: Date.now(),
+      isDeadOnly,
     };
 
     setChatMessages((prev) => [...prev, msg]);
@@ -1027,6 +1056,7 @@ function AmongUsApp() {
         const assigned = chosenTasks.map((t) => t.id);
         playersMap[pId].assignedTasks = assigned;
         playersMap[pId].completedTasks = [];
+        playersMap[pId].emergencyMeetingsLeft = prev.settings.emergencyMeetings;
 
         if (!isImpostor) {
           totalTasksNeeded += assigned.length;
@@ -1092,7 +1122,7 @@ function AmongUsApp() {
               .forEach((bot) => {
                 setTimeout(() => {
                   setGameState((s) => {
-                    if (s.phase !== 'meeting' || !s.players[bot.id] || s.players[bot.id].hasVoted) return s;
+                    if (s.phase !== 'meeting' || s.meetingPhase !== 'voting' || !s.players[bot.id] || s.players[bot.id].hasVoted) return s;
                     const aliveTargets = Object.values(s.players).filter((p) => p.isAlive);
                     const randomChoice = Math.random() > 0.3
                       ? aliveTargets[Math.floor(Math.random() * aliveTargets.length)].id
@@ -1115,12 +1145,18 @@ function AmongUsApp() {
                     });
                     return updated;
                   });
-                }, Math.random() * 8000 + 2000);
+                }, Math.random() * 6000 + 1500);
               });
           }
 
-          // Voting ended -> Calculate Ejection
+          // Voting ended -> Switch to Results Phase (Show votes for 4s)
           if (newPhase === 'voting' && newTimer <= 0) {
+            newPhase = 'results';
+            newTimer = 4;
+          }
+
+          // Results ended -> Calculate Ejection
+          if (newPhase === 'results' && newTimer <= 0) {
             clearInterval(meetingIntervalRef.current!);
 
             // Count votes
@@ -1167,6 +1203,7 @@ function AmongUsApp() {
               wasTie: isTie,
               wasSkipped: wasSkipped,
               remainingImpostors: remainingImps,
+              confirmEjects: prev.settings.confirmEjects,
             };
 
             const ejectionState: GameState = {
@@ -1312,6 +1349,8 @@ function AmongUsApp() {
 
         const updatedPlayers = { ...prev.players };
         let updatedDeadBodies = [...prev.deadBodies];
+        let updatedCompletedTasksCount = prev.completedTasksCount || 0;
+        let updatedActiveSabotage = prev.activeSabotage;
         let anyBotMoved = false;
         let triggeredReport = false;
         let reportingBotId: string | null = null;
@@ -1405,14 +1444,14 @@ function AmongUsApp() {
               let targetX = p.x;
               let targetY = p.y;
 
-              if (prev.activeSabotage && p.role !== 'impostor' && Math.random() < 0.6) {
-                if (prev.activeSabotage.type === 'lights') {
+              if (updatedActiveSabotage && p.role !== 'impostor' && Math.random() < 0.6) {
+                if (updatedActiveSabotage.type === 'lights') {
                   targetX = 670;
                   targetY = 960;
-                } else if (prev.activeSabotage.type === 'reactor') {
+                } else if (updatedActiveSabotage.type === 'reactor') {
                   targetX = 140;
                   targetY = 720;
-                } else if (prev.activeSabotage.type === 'o2') {
+                } else if (updatedActiveSabotage.type === 'o2') {
                   targetX = 1740;
                   targetY = 800;
                 }
@@ -1434,6 +1473,27 @@ function AmongUsApp() {
             if (bState.pauseTicks > 0) {
               bState.pauseTicks--;
               p.isMoving = false;
+
+              // If bot finishes working on an assigned task, complete it!
+              if (bState.pauseTicks === 0 && p.role !== 'impostor') {
+                const assignedUnfinished = p.assignedTasks.find((tId) => !p.completedTasks.includes(tId));
+                if (assignedUnfinished) {
+                  p.completedTasks = [...p.completedTasks, assignedUnfinished];
+                  updatedCompletedTasksCount++;
+                }
+
+                // If at sabotage location, fix it
+                if (updatedActiveSabotage) {
+                  const sab = updatedActiveSabotage;
+                  let atSab = false;
+                  if (sab.type === 'lights' && Math.hypot(p.x - 670, p.y - 960) < 100) atSab = true;
+                  if (sab.type === 'reactor' && Math.hypot(p.x - 140, p.y - 720) < 100) atSab = true;
+                  if (sab.type === 'o2' && Math.hypot(p.x - 1740, p.y - 800) < 100) atSab = true;
+                  if (atSab) {
+                    updatedActiveSabotage = null;
+                  }
+                }
+              }
               continue;
             }
 
@@ -1480,6 +1540,7 @@ function AmongUsApp() {
             meetingPhase: 'discussion',
             meetingTimer: prev.settings.discussionTime,
             activeSabotage: null,
+            completedTasksCount: updatedCompletedTasksCount,
           };
           networkRef.current?.broadcast({ type: 'STATE_SYNC', gameState: nextMeetingState });
           return nextMeetingState;
@@ -1490,6 +1551,8 @@ function AmongUsApp() {
           ...prev,
           players: updatedPlayers,
           deadBodies: updatedDeadBodies,
+          completedTasksCount: updatedCompletedTasksCount,
+          activeSabotage: updatedActiveSabotage,
         };
 
         const winCheck = checkWinConditions(nextState);
@@ -1874,6 +1937,7 @@ function AmongUsApp() {
           meetingTimer={gameState.meetingTimer || 0}
           phase={gameState.meetingPhase || 'discussion'}
           chatMessages={chatMessages}
+          anonymousVotes={gameState.settings.anonymousVotes}
           onSendMessage={handleSendMessage}
           onCastVote={handleCastVote}
         />

@@ -779,6 +779,60 @@ export function Lobby({
                   </div>
                 </div>
               </div>
+
+              {/* Emergency Meetings per player */}
+              <div className="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                <label className="text-slate-300 font-semibold">Meetings / Spieler</label>
+                <div className="flex items-center gap-1.5">
+                  {[1, 2, 3, 5].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => onUpdateSettings({ emergencyMeetings: m })}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        settings.emergencyMeetings === m
+                          ? 'bg-red-600 text-white border border-red-400'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                      }`}
+                    >
+                      {m}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Confirm Ejects & Anonymous Votes Toggles */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex flex-col justify-between gap-1.5">
+                  <span className="text-slate-300 font-semibold text-xs">Rauswürfe anzeigen</span>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ confirmEjects: !settings.confirmEjects })}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      settings.confirmEjects
+                        ? 'bg-emerald-600/30 border border-emerald-500/60 text-emerald-300'
+                        : 'bg-slate-900 border border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {settings.confirmEjects ? 'AN (Rolle enthüllen)' : 'AUS (Anonym)'}
+                  </button>
+                </div>
+
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 flex flex-col justify-between gap-1.5">
+                  <span className="text-slate-300 font-semibold text-xs">Anonyme Stimmen</span>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateSettings({ anonymousVotes: !settings.anonymousVotes })}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      settings.anonymousVotes
+                        ? 'bg-purple-600/30 border border-purple-500/60 text-purple-300'
+                        : 'bg-slate-900 border border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {settings.anonymousVotes ? 'AN (Graue Stimmen)' : 'AUS (Farbig)'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <button

@@ -20,7 +20,8 @@ interface MeetingModalProps {
   meetingTimer: number;
   phase: 'discussion' | 'voting' | 'results';
   chatMessages: ChatMessage[];
-  onSendMessage: (text: string) => void;
+  anonymousVotes?: boolean;
+  onSendMessage: (text: string, isDeadOnly?: boolean) => void;
   onCastVote: (targetId: string | 'skip') => void;
 }
 
@@ -34,6 +35,7 @@ export function MeetingModal({
   meetingTimer,
   phase,
   chatMessages,
+  anonymousVotes = false,
   onSendMessage,
   onCastVote,
 }: MeetingModalProps) {
@@ -50,8 +52,9 @@ export function MeetingModal({
 
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !localPlayer.isAlive) return;
-    onSendMessage(chatInput.trim());
+    if (!chatInput.trim()) return;
+    const isDeadOnly = !localPlayer.isAlive;
+    onSendMessage(chatInput.trim(), isDeadOnly);
     setChatInput('');
   };
 
@@ -67,6 +70,13 @@ export function MeetingModal({
       if (!votesMap[p.votedFor]) votesMap[p.votedFor] = [];
       votesMap[p.votedFor].push(p);
     }
+  });
+
+  // Filter messages based on player alive status
+  const visibleMessages = chatMessages.filter((msg) => {
+    if (msg.isSystem) return true;
+    if (msg.isDeadOnly && localPlayer.isAlive) return false;
+    return true;
   });
 
   return (
@@ -116,7 +126,7 @@ export function MeetingModal({
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          <span>💬 CHAT ({chatMessages.length})</span>
+          <span>💬 CHAT ({visibleMessages.length})</span>
         </button>
       </div>
 
@@ -205,8 +215,12 @@ export function MeetingModal({
                             <div
                               key={`voter-${v.id}`}
                               className="w-5 h-5 rounded-full border border-black shadow"
-                              style={{ backgroundColor: PLAYER_COLORS.find((c) => c.id === v.color)?.hex }}
-                              title={`${v.name} stimmte ab`}
+                              style={{
+                                backgroundColor: anonymousVotes
+                                  ? '#64748b'
+                                  : PLAYER_COLORS.find((c) => c.id === v.color)?.hex || '#ccc',
+                              }}
+                              title={anonymousVotes ? 'Anonyme Stimme' : `${v.name} stimmte ab`}
                             />
                           ))}
                         </div>
@@ -216,6 +230,29 @@ export function MeetingModal({
                 );
               })}
             </div>
+
+            {/* Results phase: Show Skip Votes */}
+            {phase === 'results' && votesMap.skip && votesMap.skip.length > 0 && (
+              <div className="mt-3 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+                <span className="font-mono text-xs text-slate-400 flex items-center gap-1.5">
+                  <SkipForward className="w-3.5 h-3.5" /> Überspringen-Stimmen:
+                </span>
+                <div className="flex -space-x-1">
+                  {votesMap.skip.map((v) => (
+                    <div
+                      key={`skip-${v.id}`}
+                      className="w-5 h-5 rounded-full border border-black shadow"
+                      style={{
+                        backgroundColor: anonymousVotes
+                          ? '#64748b'
+                          : PLAYER_COLORS.find((c) => c.id === v.color)?.hex || '#ccc',
+                      }}
+                      title={anonymousVotes ? 'Anonyme Stimme' : `${v.name} übersprungen`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Voting Action Bar */}
@@ -254,18 +291,25 @@ export function MeetingModal({
           }`}
         >
           <div>
-            <span className="text-xs font-mono font-bold uppercase text-slate-400 block mb-3 border-b border-slate-800 pb-2">
-              💬 Meeting-Chat
-            </span>
+            <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+              <span className="text-xs font-mono font-bold uppercase text-slate-400 block">
+                💬 Meeting-Chat
+              </span>
+              {!localPlayer.isAlive && (
+                <span className="text-[10px] font-mono text-purple-400 font-bold bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800">
+                  👻 GEISTER-KANAL
+                </span>
+              )}
+            </div>
 
             {/* Messages Feed */}
             <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
-              {chatMessages.length === 0 ? (
+              {visibleMessages.length === 0 ? (
                 <div className="text-center text-xs text-slate-500 font-mono py-8">
                   Wer war es? Diskutiert hier!
                 </div>
               ) : (
-                chatMessages.map((msg) => {
+                visibleMessages.map((msg) => {
                   const isMe = msg.senderId === localPlayerId;
                   const col = PLAYER_COLORS.find((c) => c.id === msg.senderColor);
                   return (
@@ -276,10 +320,15 @@ export function MeetingModal({
                           style={{ backgroundColor: col?.hex || '#ccc' }}
                         />
                         <span>{msg.senderName}</span>
+                        {msg.isDeadOnly && <span className="text-purple-400 font-mono">[👻 GEIST]</span>}
                       </div>
                       <div
                         className={`inline-block px-3 py-1.5 rounded-xl break-words max-w-[90%] ${
-                          isMe ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-200'
+                          msg.isDeadOnly
+                            ? 'bg-purple-950/80 border border-purple-700 text-purple-200'
+                            : isMe
+                            ? 'bg-red-600 text-white'
+                            : 'bg-slate-800 text-slate-200'
                         }`}
                       >
                         {msg.text}
@@ -297,15 +346,14 @@ export function MeetingModal({
             <input
               type="text"
               value={chatInput}
-              disabled={!localPlayer.isAlive}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={localPlayer.isAlive ? 'Verdacht äußern...' : 'Tote können nicht chatten!'}
+              placeholder={localPlayer.isAlive ? 'Verdacht äußern...' : 'Geister-Chat (nur für Tote)...'}
               maxLength={80}
-              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500 disabled:opacity-40"
+              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
             />
             <button
               type="submit"
-              disabled={!chatInput.trim() || !localPlayer.isAlive}
+              disabled={!chatInput.trim()}
               className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-xs font-bold transition-all cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
