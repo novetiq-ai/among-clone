@@ -34,6 +34,7 @@ import {
   HATS,
   ActiveSabotage,
   NetworkMessage,
+  REPORT_RANGE,
 } from '@/types/game';
 import { sound } from '@/lib/sound';
 import { generateRoomCode } from '@/lib/peer';
@@ -504,13 +505,12 @@ export function registerTier1Tests(runner: TestRunner) {
   // --------------------------------------------------------------------------
   runner.setContext(1, 9, 'Dead Body Reporting & Trigger');
 
-  runner.test('F09-T1: Living player near dead body with LOS can report body', () => {
+  runner.test('F09-T1: Living player near a dead body can report without a vision raycast', () => {
     const player: Player = { id: 'p1', name: 'Reporter', color: 'orange', isHost: false, isReady: true, role: 'crewmate', isAlive: true, x: 1400, y: 650, facing: 'right', isMoving: false, assignedTasks: [], completedTasks: [] };
     const body: DeadBody = { id: 'b1', playerId: 'v1', playerName: 'Victim', color: 'blue', x: 1440, y: 650, reported: false };
 
     const dist = Math.hypot(player.x - body.x, player.y - body.y);
-    const hasLOS = hasLineOfSight(player.x, player.y, body.x, body.y);
-    const canReport = player.isAlive && !body.reported && dist <= 120 && hasLOS;
+    const canReport = player.isAlive && !body.reported && dist <= REPORT_RANGE;
 
     expect(canReport).toBeTruthy();
   });
