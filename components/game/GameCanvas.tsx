@@ -343,6 +343,12 @@ export function GameCanvas({
     }
   }, [nearbyEmergencyButton, emergencyCooldown, onEmergencyMeeting, nearbyFixSabotage, onFixSabotage, nearbySecurityDesk, handleToggleCCTV, nearbyAdminTable, nearbyTask]);
 
+  const handleTriggerSabotage = useCallback((type: SabotageType) => {
+    if (sabotageCooldown > 0 || activeSabotage) return;
+    setSabotageCooldown(15);
+    onTriggerSabotage?.(type);
+  }, [activeSabotage, onTriggerSabotage, sabotageCooldown]);
+
   // Keyboard Event Listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -631,11 +637,12 @@ export function GameCanvas({
             } else if (curActiveSab.type === 'reactor') {
               const dTop = Math.hypot(currentX - 100, currentY - 720);
               const dBottom = Math.hypot(currentX - 100, currentY - 920);
-              if (dTop < 85 || dBottom < 85) nearbySab = 'reactor';
+              if (!(curActiveSab.reactorHands ?? []).includes(localPlayerId) && (dTop < 85 || dBottom < 85)) nearbySab = 'reactor';
             } else if (curActiveSab.type === 'o2') {
               const dO2Room = Math.hypot(currentX - 1520, currentY - 620);
               const dAdminRoom = Math.hypot(currentX - 1590, currentY - 820);
-              if (dO2Room < 85 || dAdminRoom < 85) nearbySab = 'o2';
+              const fixedRooms = curActiveSab.o2FixedRooms ?? [];
+              if ((dO2Room < 85 && !fixedRooms.includes('O2')) || (dAdminRoom < 85 && !fixedRooms.includes('Admin'))) nearbySab = 'o2';
             } else if (curActiveSab.type === 'comms') {
               const d = Math.hypot(currentX - 1450, currentY - 1350);
               if (d < 85) nearbySab = 'comms';
@@ -1185,7 +1192,7 @@ export function GameCanvas({
       {/* Impostor Sabotage Map Modal */}
       {showSabotageModal && onTriggerSabotage && onLockDoors && (
         <SabotageModal
-          onTriggerSabotage={onTriggerSabotage}
+          onTriggerSabotage={handleTriggerSabotage}
           onLockDoors={onLockDoors}
           cooldownRemaining={sabotageCooldown}
           activeSabotageType={activeSabotage?.type || null}
@@ -1227,5 +1234,3 @@ export function GameCanvas({
     </div>
   );
 }
-
-
