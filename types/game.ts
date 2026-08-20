@@ -155,6 +155,9 @@ export interface DeadBody {
   reported: boolean;
 }
 
+// Kept in shared game state so client affordances and host validation agree.
+export const REPORT_RANGE = 150;
+
 
 export interface VentDefinition {
   id: string;
