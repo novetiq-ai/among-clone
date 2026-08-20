@@ -11,6 +11,7 @@ import {
   SabotageType,
   PlayerColor,
   HatType,
+  REPORT_RANGE,
 } from '@/types/game';
 import {
   ALL_TASKS,
@@ -657,13 +658,15 @@ export function GameCanvas({
           }
           setNearbyTask(foundTask);
 
-          // Dead Body Proximity (Requires living player + Line of Sight)
+          // Dead Body Proximity. Bodies should remain reportable when their
+          // sprite overlaps a wall collider, so reporting uses close range
+          // instead of the stricter movement/vision line-of-sight raycast.
           let foundBody: DeadBody | null = null;
           if (localP.isAlive && !localP.inVent) {
             for (const b of curDeadBodies) {
               if (b.reported) continue;
               const d = Math.hypot(currentX - b.x, currentY - b.y);
-              if (d < 120 && hasLineOfSight(currentX, currentY, b.x, b.y, curLockedDoors)) {
+              if (d <= REPORT_RANGE) {
                 foundBody = b;
                 break;
               }
