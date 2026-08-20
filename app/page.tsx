@@ -13,6 +13,7 @@ import {
   NetworkMessage,
   DeadBody,
   EjectionData,
+  REPORT_RANGE,
 } from '@/types/game';
 import { ALL_TASKS, SPAWN_POSITION, getSpawnPosition, WAYPOINTS, findBotPath, getNearestWaypoint, VENTS } from '@/lib/map-data';
 import { NetworkManager, generateRoomCode } from '@/lib/peer';
@@ -340,7 +341,19 @@ function AmongUsApp() {
                   },
                 };
               } else if (msg.type === 'REPORT_BODY') {
-                // Mark all dead bodies as reported
+                const body = msg.bodyId
+                  ? newState.deadBodies.find((candidate) => candidate.id === msg.bodyId)
+                  : undefined;
+
+                // Only accept reports for an existing, unreported body in range.
+                // This mirrors the client-side report affordance and prevents
+                // malformed network messages from opening a meeting anywhere.
+                if (!body || body.reported) return prevState;
+                const reportDistance = Math.hypot(reporter.x - body.x, reporter.y - body.y);
+                if (reportDistance > REPORT_RANGE) return prevState;
+
+                // The meeting clears all bodies after voting/ejection; marking
+                // them now prevents another report while the meeting is opening.
                 newState.deadBodies = newState.deadBodies.map((b) => ({
                   ...b,
                   reported: true,
