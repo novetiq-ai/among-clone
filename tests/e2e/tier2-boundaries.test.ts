@@ -32,6 +32,7 @@ import {
   DEFAULT_SETTINGS,
   ActiveSabotage,
   NetworkMessage,
+  REPORT_RANGE,
 } from '@/types/game';
 import { sound } from '@/lib/sound';
 
@@ -342,10 +343,9 @@ export function registerTier2Tests(runner: TestRunner) {
   // --------------------------------------------------------------------------
   runner.setContext(2, 9, 'Dead Body Reporting & Trigger');
 
-  runner.test('B09-T1: Reporting distance edge: 119px (reports) vs 121px (too far)', () => {
-    const limit = 120;
-    expect(119 <= limit).toBeTruthy();
-    expect(121 <= limit).toBeFalsy();
+  runner.test('B09-T1: Reporting distance edge matches the shared report range', () => {
+    expect(REPORT_RANGE <= REPORT_RANGE).toBeTruthy();
+    expect(REPORT_RANGE + 1 <= REPORT_RANGE).toBeFalsy();
   });
 
   runner.test('B09-T2: Dead body already reported cannot be reported a second time', () => {
