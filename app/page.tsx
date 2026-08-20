@@ -28,6 +28,80 @@ import { AstronautAvatar } from '@/components/AstronautAvatar';
 import { SabotageType, ActiveSabotage, HatType, HATS } from '@/types/game';
 import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 
+const SABOTAGE_FIX_RANGE = 120;
+
+type SabotageFixPoint = {
+  x: number;
+  y: number;
+  room?: 'O2' | 'Admin';
+};
+
+const SABOTAGE_FIX_POINTS: Record<SabotageType, SabotageFixPoint[]> = {
+  lights: [{ x: 760, y: 1080 }],
+  reactor: [{ x: 100, y: 720 }, { x: 100, y: 920 }],
+  o2: [{ x: 1520, y: 620, room: 'O2' }, { x: 1590, y: 820, room: 'Admin' }],
+  comms: [{ x: 1450, y: 1350 }],
+};
+
+function getSabotageFixPoint(type: SabotageType, x: number, y: number) {
+  return SABOTAGE_FIX_POINTS[type].find((point) => (
+    Math.hypot(x - point.x, y - point.y) <= SABOTAGE_FIX_RANGE
+  ));
+}
+
+/**
+ * Returns undefined for an invalid or duplicate repair attempt, the updated
+ * sabotage for a partial repair, and null once the sabotage is fully resolved.
+ */
+function applySabotageFix(
+  sabotage: ActiveSabotage,
+  fixerId: string,
+  fixerX: number,
+  fixerY: number,
+): ActiveSabotage | null | undefined {
+  const fixPoint = getSabotageFixPoint(sabotage.type, fixerX, fixerY);
+  if (!fixPoint) return undefined;
+
+  if (sabotage.type === 'reactor') {
+    const reactorHands = sabotage.reactorHands ?? [];
+    if (reactorHands.includes(fixerId)) return undefined;
+
+    const nextHands = [...reactorHands, fixerId];
+    if (nextHands.length >= (sabotage.requiredFixes ?? 2)) return null;
+
+    return { ...sabotage, reactorHands: nextHands, currentFixes: nextHands.length };
+  }
+
+  if (sabotage.type === 'o2') {
+    if (!fixPoint.room) return undefined;
+
+    const o2FixedRooms = sabotage.o2FixedRooms ?? [];
+    if (o2FixedRooms.includes(fixPoint.room)) return undefined;
+
+    const nextRooms = [...o2FixedRooms, fixPoint.room];
+    if (nextRooms.length >= (sabotage.requiredFixes ?? 2)) return null;
+
+    return { ...sabotage, o2FixedRooms: nextRooms, currentFixes: nextRooms.length };
+  }
+
+  return null;
+}
+
+function getBotSabotageTarget(sabotage: ActiveSabotage, botId: string): SabotageFixPoint {
+  const points = SABOTAGE_FIX_POINTS[sabotage.type];
+
+  if (sabotage.type === 'o2') {
+    return points.find((point) => !sabotage.o2FixedRooms?.includes(point.room!)) ?? points[0];
+  }
+
+  if (sabotage.type === 'reactor') {
+    const botNumber = [...botId].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+    return points[botNumber % points.length];
+  }
+
+  return points[0];
+}
+
 function AmongUsApp() {
   const searchParams = useSearchParams();
   const initialRoomQuery = searchParams.get('room') || '';
@@ -427,6 +501,7 @@ function AmongUsApp() {
           }
 
           case 'COMPLETE_TASK': {
+            if (newState.phase !== 'playing') return prevState;
             const player = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
             if (player && !player.completedTasks.includes(msg.taskId) && player.assignedTasks.includes(msg.taskId)) {
               const updatedTasks = [...player.completedTasks, msg.taskId];
@@ -531,15 +606,18 @@ function AmongUsApp() {
 
           case 'TRIGGER_SABOTAGE': {
             const sender = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
-            if (!sender || !sender.isAlive || sender.role !== 'impostor') return prevState;
+            if (newState.phase !== 'playing' || newState.activeSabotage || !sender || !sender.isAlive || sender.role !== 'impostor') return prevState;
 
             playSabotageAlarm();
             const countdown = msg.sabotageType === 'reactor' || msg.sabotageType === 'o2' ? 30 : 0;
+            const requiresTwoFixes = msg.sabotageType === 'reactor' || msg.sabotageType === 'o2';
             newState.activeSabotage = {
               type: msg.sabotageType,
               countdown,
-              requiredFixes: msg.sabotageType === 'reactor' ? 2 : 1,
+              requiredFixes: requiresTwoFixes ? 2 : 1,
               currentFixes: 0,
+              ...(msg.sabotageType === 'reactor' ? { reactorHands: [] } : {}),
+              ...(msg.sabotageType === 'o2' ? { o2FixedRooms: [] } : {}),
             };
             networkRef.current?.broadcast({
               type: 'STATE_SYNC',
@@ -549,13 +627,25 @@ function AmongUsApp() {
           }
 
           case 'FIX_SABOTAGE': {
-            if (newState.activeSabotage && newState.activeSabotage.type === msg.sabotageType) {
-              newState.activeSabotage = null;
-              networkRef.current?.broadcast({
-                type: 'STATE_SYNC',
-                gameState: newState,
-              });
-            }
+            const fixer = newState.players[senderId] || newState.players[localPlayerIdRef.current || localPlayerId];
+            const activeSabotage = newState.activeSabotage;
+            if (
+              newState.phase !== 'playing' ||
+              !activeSabotage ||
+              activeSabotage.type !== msg.sabotageType ||
+              !fixer ||
+              !fixer.isAlive ||
+              fixer.inVent
+            ) return prevState;
+
+            const repairedSabotage = applySabotageFix(activeSabotage, fixer.id, fixer.x, fixer.y);
+            if (repairedSabotage === undefined) return prevState;
+
+            newState.activeSabotage = repairedSabotage;
+            networkRef.current?.broadcast({
+              type: 'STATE_SYNC',
+              gameState: newState,
+            });
             return newState;
           }
 
@@ -1574,16 +1664,9 @@ function AmongUsApp() {
 
               // Alive Crewmate bots prioritize sabotage repair
               if (p.isAlive && updatedActiveSabotage && p.role !== 'impostor' && Math.random() < 0.6) {
-                if (updatedActiveSabotage.type === 'lights') {
-                  targetX = 670;
-                  targetY = 960;
-                } else if (updatedActiveSabotage.type === 'reactor') {
-                  targetX = 140;
-                  targetY = 720;
-                } else if (updatedActiveSabotage.type === 'o2') {
-                  targetX = 1740;
-                  targetY = 800;
-                }
+                const sabotageTarget = getBotSabotageTarget(updatedActiveSabotage, p.id);
+                targetX = sabotageTarget.x;
+                targetY = sabotageTarget.y;
               } else {
                 // Ghost or living crewmate navigates to assigned task
                 const unfinishedTask = p.assignedTasks.find((tId) => !p.completedTasks.includes(tId));
@@ -1616,13 +1699,12 @@ function AmongUsApp() {
 
                 // If at sabotage location, fix it (Living crewmates only)
                 if (p.isAlive && updatedActiveSabotage) {
-                  const sab = updatedActiveSabotage;
-                  let atSab = false;
-                  if (sab.type === 'lights' && Math.hypot(p.x - 670, p.y - 960) < 100) atSab = true;
-                  if (sab.type === 'reactor' && Math.hypot(p.x - 140, p.y - 720) < 100) atSab = true;
-                  if (sab.type === 'o2' && Math.hypot(p.x - 1740, p.y - 800) < 100) atSab = true;
-                  if (atSab) {
-                    updatedActiveSabotage = null;
+                  const sabotageTarget = getBotSabotageTarget(updatedActiveSabotage, p.id);
+                  if (Math.hypot(p.x - sabotageTarget.x, p.y - sabotageTarget.y) < 100) {
+                    const repairedSabotage = applySabotageFix(updatedActiveSabotage, p.id, p.x, p.y);
+                    if (repairedSabotage !== undefined) {
+                      updatedActiveSabotage = repairedSabotage;
+                    }
                   }
                 }
               }
