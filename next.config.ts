@@ -14,7 +14,9 @@ const nextConfig: NextConfig = {
   agentRules: false,
   reactStrictMode: true,
   poweredByHeader: false,
-  output: 'standalone',
+  // Next 16.3 standalone output conflicts with Vercel's injected build adapter.
+  // Vercel packages the application itself, so standalone is only needed elsewhere.
+  output: process.env.VERCEL ? undefined : 'standalone',
   outputFileTracingRoot: process.cwd(),
   turbopack: {
     root: process.cwd(),

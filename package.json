@@ -4,7 +4,7 @@
   "private": true,
   "description": "A private browser-based social-deduction game with peer-to-peer multiplayer.",
   "engines": {
-    "node": ">=20.9.0 <26"
+    "node": "24.x"
   },
   "packageManager": "npm@11.11.0",
   "scripts": {
