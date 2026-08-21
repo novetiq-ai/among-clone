@@ -125,7 +125,7 @@ export function drawTheSkeld(
   drawDeepSpace(ctx, time);
   ctx.restore();
 
-  // Camera translation & Zoom for The Skeld interior
+  // Camera translation and zoom for the Nebula vessel interior
   ctx.scale(zoom, zoom);
   ctx.translate(-viewX, -viewY);
 
@@ -133,24 +133,24 @@ export function drawTheSkeld(
   drawShipHull(ctx, time);
 
   // 4. Room Floors & Hallways
-  drawShipFloors(ctx, time, activeSabotage);
+  drawShipFloors(ctx);
 
   // 5. Hazard Stripes & Corridor Details
-  drawRoomDecals(ctx, time);
-  drawCorridorDetails(ctx, time);
+  drawRoomDecals(ctx);
+  drawCorridorDetails(ctx);
 
   // 6. Detailed Room Furniture & Machines
-  drawDetailedRoomObjects(ctx, time, localPlayer);
+  drawDetailedRoomObjects(ctx, time);
 
   // 7. Vents
-  drawVents(ctx, localPlayer, time);
+  drawVents(ctx, localPlayer);
 
   // 8. Security Cameras
   drawSecurityCameras(ctx, isSecurityCamActive || false, time);
 
   // 9. Locked Doors
   if (lockedDoors) {
-    drawLockedDoors(ctx, lockedDoors, time);
+    drawLockedDoors(ctx, lockedDoors);
   }
 
   // 10. Task Stations
@@ -166,7 +166,7 @@ export function drawTheSkeld(
   drawPlayers(ctx, players, localPlayer, time, activeSabotage, lockedDoors);
 
   // 14. Solid Walls & Bulkheads (2.5D Occlusion)
-  drawWallsAndBulkheads(ctx, time);
+  drawWallsAndBulkheads(ctx);
 
   // 15. Sabotage Beacons
   drawSabotageBeacons(ctx, activeSabotage, time);
@@ -177,7 +177,7 @@ export function drawTheSkeld(
   ctx.restore();
 
   // 17. Screen-Space Directional Sabotage Arrows
-  drawSabotageDirectionalArrows(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage, time);
+  drawSabotageDirectionalArrows(ctx, canvasWidth, canvasHeight, localPlayer, activeSabotage);
 }
 
 function drawDeepSpace(ctx: CanvasRenderingContext2D, time: number) {
@@ -295,7 +295,7 @@ function drawShipHull(ctx: CanvasRenderingContext2D, time: number) {
   ctx.restore();
 }
 
-function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabotage?: ActiveSabotage | null) {
+function drawShipFloors(ctx: CanvasRenderingContext2D) {
   // 1. Draw Corridors
   for (const corr of CORRIDORS) {
     ctx.fillStyle = '#1c2638';
@@ -370,7 +370,7 @@ function drawShipFloors(ctx: CanvasRenderingContext2D, time: number, activeSabot
   }
 }
 
-function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
+function drawRoomDecals(ctx: CanvasRenderingContext2D) {
   const drawHazardTape = (x: number, y: number, w: number, h: number) => {
     ctx.save();
     ctx.fillStyle = '#f59e0b';
@@ -406,7 +406,7 @@ function drawRoomDecals(ctx: CanvasRenderingContext2D, time: number) {
   drawHazardTape(1320, 840, 40, 14); // Admin West
 }
 
-function drawCorridorDetails(ctx: CanvasRenderingContext2D, time: number) {
+function drawCorridorDetails(ctx: CanvasRenderingContext2D) {
   for (const corr of CORRIDORS) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
     ctx.lineWidth = 3;
@@ -425,7 +425,7 @@ function drawCorridorDetails(ctx: CanvasRenderingContext2D, time: number) {
   }
 }
 
-function drawDetailedRoomObjects(ctx: CanvasRenderingContext2D, time: number, localPlayer: Player) {
+function drawDetailedRoomObjects(ctx: CanvasRenderingContext2D, time: number) {
   // 1. CAFETERIA (Center: 1200, 500)
   // Large Central Meeting Table
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -646,7 +646,7 @@ function drawEmergencyButton(ctx: CanvasRenderingContext2D, localPlayer: Player,
   ctx.restore();
 }
 
-function drawVents(ctx: CanvasRenderingContext2D, localPlayer: Player, time: number) {
+function drawVents(ctx: CanvasRenderingContext2D, localPlayer: Player) {
   const isImpostor = localPlayer.role === 'impostor';
 
   for (const vent of VENTS) {
@@ -742,7 +742,7 @@ function drawSecurityCameras(ctx: CanvasRenderingContext2D, isSecurityCamActive:
   }
 }
 
-function drawLockedDoors(ctx: CanvasRenderingContext2D, lockedDoors: Record<string, number>, time: number) {
+function drawLockedDoors(ctx: CanvasRenderingContext2D, lockedDoors: Record<string, number>) {
   const now = Date.now();
   for (const [roomKey, expiry] of Object.entries(lockedDoors)) {
     if (expiry > now) {
@@ -876,7 +876,7 @@ function drawPlayers(
 
     // Hat
     if (player.hat && player.hat !== 'none') {
-      drawPlayerCanvasHat(ctx, player.hat, !player.isAlive);
+      drawPlayerCanvasHat(ctx, player.hat);
     }
 
     // Player Name Tag
@@ -889,7 +889,7 @@ function drawPlayers(
   }
 }
 
-function drawPlayerCanvasHat(ctx: CanvasRenderingContext2D, hat?: HatType, isGhost?: boolean) {
+function drawPlayerCanvasHat(ctx: CanvasRenderingContext2D, hat?: HatType) {
   if (!hat || hat === 'none') return;
   ctx.save();
   ctx.translate(0, -18);
@@ -923,7 +923,7 @@ function drawPlayerCanvasHat(ctx: CanvasRenderingContext2D, hat?: HatType, isGho
   ctx.restore();
 }
 
-function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D, time: number) {
+function drawWallsAndBulkheads(ctx: CanvasRenderingContext2D) {
   for (const wall of WALLS) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(wall.x, wall.y + 8, wall.width, wall.height);
@@ -1055,8 +1055,7 @@ function drawSabotageDirectionalArrows(
   canvasWidth: number,
   canvasHeight: number,
   localPlayer: Player,
-  activeSabotage: ActiveSabotage | null | undefined,
-  time: number
+  activeSabotage: ActiveSabotage | null | undefined
 ) {
   const targets = getSabotageTargets(activeSabotage);
   if (targets.length === 0) return;

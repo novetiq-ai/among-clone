@@ -1,6 +1,6 @@
 {
-  "name": "Among Us 2D Web P2P",
-  "description": "2D-Multiplayer-Klon von Among Us im Browser mit P2P-Echtzeit-Synchronisation via PeerJS.",
+  "name": "Nebula Deception",
+  "description": "Host-authoritative browser social deduction with private WebRTC rooms, procedural visuals and no copied media assets.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

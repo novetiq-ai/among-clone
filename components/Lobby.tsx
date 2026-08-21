@@ -19,13 +19,11 @@ import {
   Settings,
   Send,
   LogOut,
-  Sparkles,
   Info,
   Laptop,
   Bot,
   UserPlus,
   UserMinus,
-  Trash2,
   Sliders,
 } from 'lucide-react';
 
@@ -64,12 +62,14 @@ export function Lobby({
   onRemoveBot,
 }: LobbyProps) {
 
-  const [copied, setCopied] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<'code' | 'link' | null>(null);
+  const [copyStatus, setCopyStatus] = useState('');
   const [chatInput, setChatInput] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'crew' | 'chat'>('crew');
   const [customizeTab, setCustomizeTab] = useState<'color' | 'hat'>('color');
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playerList = Object.values(players);
   const takenColors = playerList.map((p) => p.color).filter((c) => c !== localPlayer.color);
@@ -78,17 +78,61 @@ export function Lobby({
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const markCopied = (target: 'code' | 'link', message: string) => {
+    setCopiedTarget(target);
+    setCopyStatus(message);
+    if (copyResetTimeoutRef.current) {
+      clearTimeout(copyResetTimeoutRef.current);
+    }
+    copyResetTimeoutRef.current = setTimeout(() => {
+      setCopiedTarget(null);
+      setCopyStatus('');
+    }, 2000);
   };
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      markCopied('link', 'Einladungslink wurde kopiert.');
+    } catch {
+      setCopiedTarget(null);
+      setCopyStatus('Einladungslink konnte nicht kopiert werden.');
+    }
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      markCopied('code', 'Raumcode wurde kopiert.');
+    } catch {
+      setCopiedTarget(null);
+      setCopyStatus('Raumcode konnte nicht kopiert werden.');
+    }
+  };
+
+  const handleNameBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const trimmedName = input.value.trim();
+    if (!trimmedName) {
+      input.setCustomValidity('Bitte gib einen Spielernamen ein.');
+      input.reportValidity();
+      return;
+    }
+
+    input.setCustomValidity('');
+    input.value = trimmedName;
+    if (trimmedName !== localPlayer.name) {
+      onUpdateProfile(trimmedName, localPlayer.color, localPlayer.isReady, localPlayer.hat);
+    }
   };
 
   const handleSendChat = (e: React.FormEvent) => {
@@ -98,7 +142,21 @@ export function Lobby({
     setChatInput('');
   };
 
-  const canStart = isHost && playerList.length >= 1;
+  const currentBotCount = playerList.filter((player) => player.isBot).length;
+  const projectedPlayerCount = Math.min(
+    settings.maxPlayers,
+    playerList.length + Math.max(0, settings.botCount - currentBotCount),
+  );
+  const projectedImpostorCount = Math.min(
+    settings.impostorCount,
+    Math.max(1, Math.floor(projectedPlayerCount / 2)),
+  );
+  const allHumanPlayersReady = playerList
+    .filter((player) => !player.isBot && !player.isHost)
+    .every((player) => player.isReady);
+  const canStart = isHost
+    && allHumanPlayersReady
+    && projectedPlayerCount > projectedImpostorCount * 2;
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between overflow-hidden font-sans select-none">
@@ -106,53 +164,61 @@ export function Lobby({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black pointer-events-none" />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b12_1px,transparent_1px),linear-gradient(to_bottom,#1e293b12_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none" />
 
-      {/* Top Header Bar with Vibrant Telemetry */}
-      <header className="relative z-10 flex items-center justify-between px-6 sm:px-8 py-3.5 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-red-600 rounded-full border-2 border-slate-100 flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.5)]">
-            <div className="w-6 h-3 bg-blue-300 rounded-sm opacity-70" />
+      {/* Responsive Brand Header */}
+      <header className="relative z-10 flex flex-wrap items-center gap-3 px-3 py-3.5 sm:px-8 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+          <div aria-hidden="true" className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 bg-red-600 rounded-full border-2 border-slate-100 flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+            <div className="w-5 h-2.5 sm:w-6 sm:h-3 bg-blue-300 rounded-sm opacity-70" />
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-amber-300">
-              THE SKELD: LOBBY
+          <div className="min-w-0">
+            <h1 className="truncate text-base sm:text-2xl font-black tracking-tight sm:tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-amber-300">
+              NEBULA DECEPTION
             </h1>
-            <p className="text-[11px] font-mono text-slate-400">
-              {isHost ? 'AUTHORITY: HOST INSTANZ' : 'CLIENT: CONNECTED TO RELAY'}
+            <p className="truncate text-[10px] sm:text-[11px] font-mono text-slate-400">
+              {isHost ? 'ROLLE: HOST' : 'ROLLE: MITSPIELER'}
             </p>
           </div>
         </div>
 
         {/* Room Code & Copy Pill */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3.5 py-1.5 rounded-xl shadow-inner">
+        <div className="order-3 flex w-full items-center gap-2 sm:order-none sm:w-auto sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-2 bg-slate-900/90 border border-slate-700 px-2.5 sm:px-3.5 py-1.5 rounded-xl shadow-inner">
             <span className="text-[11px] text-slate-400 font-mono font-bold uppercase">CODE:</span>
-            <span className="font-mono text-lg font-black text-amber-400 tracking-widest">
+            <span className="font-mono text-base sm:text-lg font-black text-amber-400 tracking-widest">
               {roomCode}
             </span>
             <button
+              type="button"
               onClick={handleCopyCode}
+              aria-label="Raumcode kopieren"
               title="Code kopieren"
-              className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all cursor-pointer"
+              className="shrink-0 min-h-11 min-w-11 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all cursor-pointer inline-flex items-center justify-center"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedTarget === 'code' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
 
           <button
+            type="button"
             onClick={handleCopyLink}
             className="hidden sm:inline-flex text-xs font-mono font-bold px-3 py-2 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 transition-all cursor-pointer"
           >
-            {copied ? 'Kopiert!' : 'Link teilen'}
+            {copiedTarget === 'link' ? 'Kopiert!' : 'Link teilen'}
           </button>
 
           <button
+            type="button"
             onClick={onLeaveRoom}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 text-xs font-semibold transition-all cursor-pointer"
+            aria-label="Lobby verlassen"
+            className="shrink-0 min-h-11 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 text-xs font-semibold transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Verlassen</span>
           </button>
         </div>
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {copyStatus}
+        </p>
       </header>
 
       {/* Main Grid: Left Settings / Customizer & Right Crew Deck / Chat */}
@@ -183,16 +249,18 @@ export function Lobby({
 
             {/* Name Input */}
             <div>
-              <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wide block mb-1">
+              <label htmlFor="player-name" className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-wide block mb-1">
                 Spielername
               </label>
               <input
+                key={localPlayer.name}
+                id="player-name"
                 type="text"
                 maxLength={12}
-                value={localPlayer.name}
-                onChange={(e) =>
-                  onUpdateProfile(e.target.value || 'Crewmate', localPlayer.color, localPlayer.isReady, localPlayer.hat)
-                }
+                defaultValue={localPlayer.name}
+                required
+                onInput={(event) => event.currentTarget.setCustomValidity('')}
+                onBlur={handleNameBlur}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-colors shadow-inner"
               />
             </div>
@@ -202,7 +270,7 @@ export function Lobby({
               <button
                 type="button"
                 onClick={() => setCustomizeTab('color')}
-                className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                className={`min-h-11 flex-1 py-2 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
                   customizeTab === 'color'
                     ? 'bg-blue-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
@@ -213,7 +281,7 @@ export function Lobby({
               <button
                 type="button"
                 onClick={() => setCustomizeTab('hat')}
-                className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                className={`min-h-11 flex-1 py-2 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
                   customizeTab === 'hat'
                     ? 'bg-amber-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
@@ -239,8 +307,9 @@ export function Lobby({
                         type="button"
                         disabled={isTaken}
                         onClick={() => onUpdateProfile(localPlayer.name, col.id, localPlayer.isReady, localPlayer.hat)}
+                        aria-label={`Anzugfarbe ${col.name}${isSelected ? ', ausgewählt' : ''}${isTaken ? ', bereits belegt' : ''}`}
                         title={`${col.name} ${isTaken ? '(Bereits belegt)' : ''}`}
-                        className={`relative w-8 h-8 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+                        className={`relative w-11 h-11 rounded-full transition-all flex items-center justify-center cursor-pointer ${
                           isSelected
                             ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 shadow-lg'
                             : isTaken
@@ -313,8 +382,9 @@ export function Lobby({
               </span>
               {isHost && (
                 <button
+                  type="button"
                   onClick={() => setShowSettingsModal(true)}
-                  className="text-xs text-blue-400 hover:text-blue-300 font-mono font-bold underline cursor-pointer"
+                  className="min-h-11 px-2 text-xs text-blue-400 hover:text-blue-300 font-mono font-bold underline cursor-pointer"
                 >
                   Anpassen
                 </button>
@@ -349,8 +419,9 @@ export function Lobby({
           {/* Tab Selection */}
           <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
             <button
+              type="button"
               onClick={() => setActiveTab('crew')}
-              className={`px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
+              className={`min-h-11 px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'crew'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                   : 'bg-slate-900/60 text-slate-400 hover:text-white'
@@ -360,8 +431,9 @@ export function Lobby({
               <span>Besatzung ({playerList.length}/{settings.maxPlayers})</span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('chat')}
-              className={`px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
+              className={`min-h-11 px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'chat'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                   : 'bg-slate-900/60 text-slate-400 hover:text-white'
@@ -412,7 +484,7 @@ export function Lobby({
                         type="button"
                         disabled={playerList.filter((p) => p.isBot).length === 0}
                         onClick={() => onRemoveBot && onRemoveBot()}
-                        className="px-3 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 disabled:opacity-30 disabled:cursor-not-allowed border border-red-800/60 text-red-300 text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        className="min-h-11 px-3 py-2 rounded-lg bg-red-950/60 hover:bg-red-900/80 disabled:opacity-30 disabled:cursor-not-allowed border border-red-800/60 text-red-300 text-xs font-mono font-bold transition-all flex items-center gap-1 cursor-pointer"
                         title="Einen Bot entfernen"
                       >
                         <UserMinus className="w-3.5 h-3.5" />
@@ -423,7 +495,7 @@ export function Lobby({
                         type="button"
                         disabled={playerList.length >= settings.maxPlayers}
                         onClick={() => onAddBot && onAddBot()}
-                        className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-mono font-bold transition-all flex items-center gap-1 shadow cursor-pointer"
+                        className="min-h-11 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-mono font-bold transition-all flex items-center gap-1 shadow cursor-pointer"
                         title="Einen Bot hinzufügen"
                       >
                         <UserPlus className="w-3.5 h-3.5" />
@@ -442,7 +514,7 @@ export function Lobby({
                             onUpdateSettings({ botCount: maxBotsAllowed });
                           }
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                        className={`min-h-11 px-3 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                           playerList.filter((p) => p.isBot).length > 0
                             ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300 hover:bg-purple-600/50'
                             : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
@@ -466,9 +538,11 @@ export function Lobby({
                       {/* If Bot and isHost, render kick button */}
                       {player.isBot && isHost && (
                         <button
+                          type="button"
                           onClick={() => onRemoveBot && onRemoveBot(player.id)}
+                          aria-label={`${player.name} entfernen`}
                           title={`${player.name} entfernen`}
-                          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xs font-bold shadow-md cursor-pointer transition-transform hover:scale-110 z-10"
+                          className="absolute -top-2 -right-2 h-10 w-10 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-xs font-bold shadow-md cursor-pointer transition-transform hover:scale-105 z-10"
                         >
                           ✕
                         </button>
@@ -510,7 +584,11 @@ export function Lobby({
               <div className="mt-8 pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Info className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>Teile den 4-stelligen Raumcode mit deinen Mitspielern!</span>
+                  <span>
+                    {canStart
+                      ? 'Alle Systeme bereit.'
+                      : 'Benötigt genug Besatzung und Bereitschaft für eine faire Runde.'}
+                  </span>
                 </div>
 
                 {isHost ? (
@@ -852,12 +930,11 @@ export function Lobby({
       {/* Telemetry Footer */}
       <footer className="relative z-10 h-12 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm flex items-center px-6 sm:px-8 justify-between">
         <div className="flex items-center gap-4 sm:gap-6 text-[10px] font-mono text-slate-500">
-          <span className="text-emerald-500 font-semibold">● P2P_ENCRYPTION_ACTIVE</span>
-          <span className="hidden sm:inline">LATENCY: ~18ms</span>
+          <span className="text-emerald-500 font-semibold">● Direkte WebRTC-Verbindung</span>
           <span>PEERS: {playerList.length}/{settings.maxPlayers}</span>
         </div>
         <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-          The Skeld • Sector 7
+          Nebula Deception
         </div>
       </footer>
     </div>

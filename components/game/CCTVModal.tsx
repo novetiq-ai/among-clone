@@ -13,7 +13,7 @@ interface CCTVModalProps {
   onClose: () => void;
 }
 
-export function CCTVModal({ players, deadBodies, localPlayer, onClose }: CCTVModalProps) {
+export function CCTVModal({ players, deadBodies, onClose }: CCTVModalProps) {
   const hasPlayedRef = React.useRef(false);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export function CCTVModal({ players, deadBodies, localPlayer, onClose }: CCTVMod
               <p className="text-xs text-slate-400">4-Kanal CCTV Videoüberwachung</p>
             </div>
           </div>
-          <span className="text-xs font-mono text-emerald-500/80 mr-12 hidden sm:inline">SKELD_SEC_NET_V2</span>
+          <span className="text-xs font-mono text-emerald-500/80 mr-12 hidden sm:inline">NEBULA_SEC_NET_V2</span>
         </div>
 
         {/* 2x2 Camera Grid */}

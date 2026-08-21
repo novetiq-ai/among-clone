@@ -17,8 +17,6 @@ import {
   ALL_TASKS,
   VENTS,
   EMERGENCY_BUTTON_POS,
-  MAP_WIDTH,
-  MAP_HEIGHT,
   resolvePlayerMovement,
   getCurrentRoomName,
 } from '@/lib/map-data';
@@ -30,7 +28,7 @@ import { CCTVModal } from './CCTVModal';
 import { AdminTableModal } from './AdminTableModal';
 import { SabotageModal } from './SabotageModal';
 import { KillAnimationOverlay } from './KillAnimationOverlay';
-import { sound, playSabotageAlarm } from '@/lib/sound';
+import { sound } from '@/lib/sound';
 import {
   Skull,
   Megaphone,
@@ -48,6 +46,29 @@ import {
   AlertTriangle,
   Zap,
 } from 'lucide-react';
+
+interface CanvasMetrics {
+  width: number;
+  height: number;
+  dpr: number;
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      'input, textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]'
+    )
+  );
+}
+
+function isGameplayControlTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    isTextEntryTarget(target) ||
+    Boolean(target.closest('button, a, [role="button"], [role="dialog"], [aria-modal="true"]'))
+  );
+}
 
 interface GameCanvasProps {
   localPlayerId: string;
@@ -102,6 +123,7 @@ export function GameCanvas({
   onSecurityCamToggle,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasMetricsRef = useRef<CanvasMetrics>({ width: 1, height: 1, dpr: 1 });
 
   // Active Interactive Modals
   const [activeTask, setActiveTask] = useState<TaskDefinition | null>(null);
@@ -111,6 +133,7 @@ export function GameCanvas({
   const [showSabotageModal, setShowSabotageModal] = useState(false);
   const [showTasksList, setShowTasksList] = useState(false);
   const [controlMode, setControlMode] = useState<'joystick' | 'dpad' | 'none'>('joystick');
+  const [joystickResetKey, setJoystickResetKey] = useState(0);
   const [isMuted, setIsMuted] = useState(sound.getMuted());
 
   const [activeKillOverlay, setActiveKillOverlay] = useState<{
@@ -120,6 +143,22 @@ export function GameCanvas({
     victimHat?: HatType;
     isVictimLocal: boolean;
   } | null>(null);
+  const systemsDisabledByComms = activeSabotage?.type === 'comms';
+  const [previousCommsState, setPreviousCommsState] = useState(systemsDisabledByComms);
+  if (previousCommsState !== systemsDisabledByComms) {
+    setPreviousCommsState(systemsDisabledByComms);
+    if (systemsDisabledByComms) {
+      setShowTasksList(false);
+      setShowAdminRadar(false);
+      setShowCCTV(false);
+      setShowSabotageModal(false);
+      setActiveTask(null);
+    }
+  }
+
+  const hasBlockingOverlay = Boolean(
+    activeTask || showMinimap || showCCTV || showAdminRadar || showSabotageModal || activeKillOverlay
+  );
 
   const handleCloseKillOverlay = React.useCallback(() => {
     setActiveKillOverlay(null);
@@ -143,11 +182,30 @@ export function GameCanvas({
   const activeSabotageRef = useRef(activeSabotage);
   const isSecurityCamActiveRef = useRef(isSecurityCamActive);
   const activeTaskRef = useRef(activeTask);
+  const showMinimapRef = useRef(showMinimap);
   const showCCTVRef = useRef(showCCTV);
   const showAdminRadarRef = useRef(showAdminRadar);
   const showSabotageModalRef = useRef(showSabotageModal);
+  const activeKillOverlayRef = useRef(activeKillOverlay);
   const settingsRef = useRef(settings);
   const onPlayerMoveRef = useRef(onPlayerMove);
+
+  const stopMovement = useCallback(() => {
+    keysPressed.current = {};
+    joystickVectorRef.current = { dx: 0, dy: 0, isMoving: false };
+    if (!wasMovingRef.current) return;
+
+    wasMovingRef.current = false;
+    const currentPlayer = localPlayerRef.current;
+    onPlayerMoveRef.current(
+      posRef.current.x,
+      posRef.current.y,
+      facingRef.current,
+      false,
+      currentPlayer.inVent,
+      currentPlayer.ventId
+    );
+  }, []);
 
   useEffect(() => {
     playersRef.current = players;
@@ -157,9 +215,11 @@ export function GameCanvas({
     activeSabotageRef.current = activeSabotage;
     isSecurityCamActiveRef.current = isSecurityCamActive;
     activeTaskRef.current = activeTask;
+    showMinimapRef.current = showMinimap;
     showCCTVRef.current = showCCTV;
     showAdminRadarRef.current = showAdminRadar;
     showSabotageModalRef.current = showSabotageModal;
+    activeKillOverlayRef.current = activeKillOverlay;
     settingsRef.current = settings;
     onPlayerMoveRef.current = onPlayerMove;
   });
@@ -251,24 +311,10 @@ export function GameCanvas({
     prevVentIdRef.current = localPlayer.ventId;
   }, [localPlayer.inVent, localPlayer.ventId, localPlayer.x, localPlayer.y]);
 
-  // Stop player movement immediately when opening any modal
+  // Stop movement immediately while any gameplay-covering overlay is active.
   useEffect(() => {
-    if (activeTask || showCCTV || showAdminRadar || showSabotageModal) {
-      keysPressed.current = {};
-      joystickVectorRef.current = { dx: 0, dy: 0, isMoving: false };
-      if (wasMovingRef.current) {
-        wasMovingRef.current = false;
-        onPlayerMoveRef.current(
-          posRef.current.x,
-          posRef.current.y,
-          facingRef.current,
-          false,
-          localPlayer.inVent,
-          localPlayer.ventId
-        );
-      }
-    }
-  }, [activeTask, showCCTV, showAdminRadar, showSabotageModal, localPlayer.inVent, localPlayer.ventId]);
+    if (hasBlockingOverlay) stopMovement();
+  }, [hasBlockingOverlay, stopMovement]);
 
   // Kill Action
   const handleKill = useCallback(() => {
@@ -317,8 +363,14 @@ export function GameCanvas({
     }
   }, [onSecurityCamToggle]);
 
+  useEffect(() => {
+    if (systemsDisabledByComms) onSecurityCamToggle?.(false);
+  }, [systemsDisabledByComms, onSecurityCamToggle]);
+
   // Handle USE action (Task / Sabotage Fix / Emergency Button / CCTV / Admin Table)
   const handleUseAction = useCallback(() => {
+    if (hasBlockingOverlay) return;
+
     if (nearbyEmergencyButton) {
       if (emergencyCooldown > 0) {
         sound.playErrorBuzz();
@@ -334,6 +386,8 @@ export function GameCanvas({
       } else if (onFixSabotage) {
         onFixSabotage(nearbyFixSabotage);
       }
+    } else if (systemsDisabledByComms && (nearbySecurityDesk || nearbyAdminTable || nearbyTask)) {
+      sound.playErrorBuzz();
     } else if (nearbySecurityDesk) {
       handleToggleCCTV(true);
     } else if (nearbyAdminTable) {
@@ -341,7 +395,19 @@ export function GameCanvas({
     } else if (nearbyTask) {
       setActiveTask(nearbyTask);
     }
-  }, [nearbyEmergencyButton, emergencyCooldown, onEmergencyMeeting, nearbyFixSabotage, onFixSabotage, nearbySecurityDesk, handleToggleCCTV, nearbyAdminTable, nearbyTask]);
+  }, [
+    hasBlockingOverlay,
+    nearbyEmergencyButton,
+    emergencyCooldown,
+    onEmergencyMeeting,
+    nearbyFixSabotage,
+    onFixSabotage,
+    systemsDisabledByComms,
+    nearbySecurityDesk,
+    handleToggleCCTV,
+    nearbyAdminTable,
+    nearbyTask,
+  ]);
 
   const handleTriggerSabotage = useCallback((type: SabotageType) => {
     if (sabotageCooldown > 0 || activeSabotage) return;
@@ -351,10 +417,14 @@ export function GameCanvas({
 
   // Keyboard Event Listeners
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeTask || showCCTV || showAdminRadar || showSabotageModal) {
-        if (e.key === 'Escape') {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isGameplayControlTarget(event.target)) return;
+
+      if (activeTask || showMinimap || showCCTV || showAdminRadar || showSabotageModal || activeKillOverlay) {
+        if (event.key === 'Escape' && !activeKillOverlay) {
+          event.preventDefault();
           setActiveTask(null);
+          setShowMinimap(false);
           handleToggleCCTV(false);
           setShowAdminRadar(false);
           setShowSabotageModal(false);
@@ -362,146 +432,153 @@ export function GameCanvas({
         return;
       }
 
+      const key = event.key.toLowerCase();
+
       // Handle in-vent keyboard controls
       if (localPlayer.inVent && localPlayer.role === 'impostor') {
-        const currVent = localPlayer.ventId ? VENTS.find((v) => v.id === localPlayer.ventId) : nearbyVent;
+        const currentVent = localPlayer.ventId ? VENTS.find((vent) => vent.id === localPlayer.ventId) : nearbyVent;
 
         // V, Space, E, or Escape to exit vent
-        if (e.key.toLowerCase() === 'v' || e.key === ' ' || e.key.toLowerCase() === 'e' || e.key === 'Escape') {
-          e.preventDefault();
+        if (key === 'v' || event.key === ' ' || key === 'e' || event.key === 'Escape') {
+          event.preventDefault();
           handleVentToggle();
           return;
         }
 
         // 1, 2, 3 to travel to connected vents
-        if (currVent && currVent.connectedVents.length > 0) {
-          const numVents = currVent.connectedVents.length;
-          if (e.key === '1' && currVent.connectedVents[0]) {
-            e.preventDefault();
-            ventIndexRef.current = 0;
-            handleTravelVent(currVent.connectedVents[0]);
+        if (currentVent && currentVent.connectedVents.length > 0) {
+          const numberOfVents = currentVent.connectedVents.length;
+          const numberedIndex = Number.parseInt(event.key, 10) - 1;
+          if (numberedIndex >= 0 && numberedIndex < numberOfVents) {
+            event.preventDefault();
+            ventIndexRef.current = numberedIndex;
+            handleTravelVent(currentVent.connectedVents[numberedIndex]);
             return;
           }
-          if (e.key === '2' && currVent.connectedVents[1]) {
-            e.preventDefault();
-            ventIndexRef.current = 1;
-            handleTravelVent(currVent.connectedVents[1]);
+          if (event.key === 'ArrowRight' || key === 'd') {
+            event.preventDefault();
+            ventIndexRef.current = (ventIndexRef.current + 1) % numberOfVents;
+            handleTravelVent(currentVent.connectedVents[ventIndexRef.current]);
             return;
           }
-          if (e.key === '3' && currVent.connectedVents[2]) {
-            e.preventDefault();
-            ventIndexRef.current = 2;
-            handleTravelVent(currVent.connectedVents[2]);
-            return;
-          }
-          if (e.key === 'Tab' || e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-            e.preventDefault();
-            ventIndexRef.current = (ventIndexRef.current + 1) % numVents;
-            handleTravelVent(currVent.connectedVents[ventIndexRef.current]);
-            return;
-          }
-          if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-            e.preventDefault();
-            ventIndexRef.current = (ventIndexRef.current - 1 + numVents) % numVents;
-            handleTravelVent(currVent.connectedVents[ventIndexRef.current]);
+          if (event.key === 'ArrowLeft' || key === 'a') {
+            event.preventDefault();
+            ventIndexRef.current = (ventIndexRef.current - 1 + numberOfVents) % numberOfVents;
+            handleTravelVent(currentVent.connectedVents[ventIndexRef.current]);
             return;
           }
         }
       }
 
-      keysPressed.current[e.key.toLowerCase()] = true;
+      keysPressed.current[key] = true;
 
-      // Space or E for USE / INTERACT
-      if (e.key === ' ' || e.key.toLowerCase() === 'e') {
-        e.preventDefault();
+      if ((event.key === ' ' || key === 'e') && !event.repeat) {
+        event.preventDefault();
         handleUseAction();
       }
 
-      // Q for KILL (Impostor)
-      if (e.key.toLowerCase() === 'q' && localPlayer.role === 'impostor' && nearbyKillTarget && killCooldown === 0) {
-        e.preventDefault();
+      if (key === 'q' && !event.repeat && localPlayer.role === 'impostor' && nearbyKillTarget && killCooldown === 0) {
+        event.preventDefault();
         handleKill();
       }
 
-      // R for REPORT
-      if (e.key.toLowerCase() === 'r' && nearbyDeadBody) {
-        e.preventDefault();
+      if (key === 'r' && !event.repeat && nearbyDeadBody) {
+        event.preventDefault();
         onReportBody(nearbyDeadBody.id);
       }
 
-      // V for VENT
-      if (e.key.toLowerCase() === 'v' && localPlayer.role === 'impostor') {
-        e.preventDefault();
+      if (key === 'v' && !event.repeat && localPlayer.role === 'impostor') {
+        event.preventDefault();
         handleVentToggle();
       }
 
-      // M for MAP
-      if (e.key.toLowerCase() === 'm') {
-        e.preventDefault();
-        setShowMinimap((prev) => !prev);
+      if (key === 'm' && !event.repeat) {
+        event.preventDefault();
+        setShowMinimap((previous) => !previous);
       }
 
-      // X or TAB for SABOTAGE (Impostor)
-      if ((e.key.toLowerCase() === 'x' || e.key === 'Tab') && localPlayer.role === 'impostor' && localPlayer.isAlive) {
-        e.preventDefault();
-        setShowSabotageModal((prev) => !prev);
+      // Tab remains reserved for accessible focus navigation.
+      if (key === 'x' && !event.repeat && localPlayer.role === 'impostor' && localPlayer.isAlive) {
+        event.preventDefault();
+        setShowSabotageModal((previous) => !previous);
       }
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keysPressed.current[e.key.toLowerCase()] = false;
+    const handleKeyUp = (event: KeyboardEvent) => {
+      keysPressed.current[event.key.toLowerCase()] = false;
     };
 
-    const handleBlur = () => {
-      keysPressed.current = {};
-      joystickVectorRef.current = { dx: 0, dy: 0, isMoving: false };
-      if (wasMovingRef.current) {
-        wasMovingRef.current = false;
-        onPlayerMoveRef.current(
-          posRef.current.x,
-          posRef.current.y,
-          facingRef.current,
-          false,
-          localPlayer.inVent,
-          localPlayer.ventId
-        );
-      }
+    const handleBlur = () => stopMovement();
+    const handleFocusIn = (event: FocusEvent) => {
+      if (isTextEntryTarget(event.target)) stopMovement();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
+    window.addEventListener('focusin', handleFocusIn);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focusin', handleFocusIn);
     };
   }, [
     activeTask,
+    showMinimap,
     showCCTV,
     showAdminRadar,
     showSabotageModal,
+    activeKillOverlay,
     localPlayer.inVent,
     localPlayer.role,
     localPlayer.ventId,
     localPlayer.isAlive,
     nearbyVent,
-    nearbyEmergencyButton,
-    nearbyFixSabotage,
-    nearbySecurityDesk,
-    nearbyAdminTable,
-    nearbyTask,
     nearbyKillTarget,
     nearbyDeadBody,
     killCooldown,
-    onEmergencyMeeting,
-    onFixSabotage,
     onReportBody,
+    handleUseAction,
     handleKill,
     handleVentToggle,
     handleTravelVent,
     handleToggleCCTV,
+    stopMovement,
   ]);
+
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, rect.width || canvas.clientWidth || window.innerWidth);
+    const height = Math.max(1, rect.height || canvas.clientHeight || window.innerHeight);
+    const dpr = Math.min(2.5, Math.max(1, window.devicePixelRatio || 1));
+    const pixelWidth = Math.round(width * dpr);
+    const pixelHeight = Math.round(height * dpr);
+
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+    canvasMetricsRef.current = { width, height, dpr };
+  }, []);
+
+  useEffect(() => {
+    resizeCanvas();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const observedElement = canvas.parentElement ?? canvas;
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resizeCanvas);
+    observer?.observe(observedElement);
+    window.addEventListener('resize', resizeCanvas);
+    window.visualViewport?.addEventListener('resize', resizeCanvas);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', resizeCanvas);
+      window.visualViewport?.removeEventListener('resize', resizeCanvas);
+    };
+  }, [resizeCanvas]);
 
   // Main Render & Physics Loop (Runs continuously without stutter or re-mount resets)
   useEffect(() => {
@@ -514,13 +591,21 @@ export function GameCanvas({
 
       const canvas = canvasRef.current;
       if (canvas) {
-        if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
-        }
+        const currentDpr = Math.min(2.5, Math.max(1, window.devicePixelRatio || 1));
+        if (canvasMetricsRef.current.dpr !== currentDpr) resizeCanvas();
+        const canvasMetrics = canvasMetricsRef.current;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          const isInteracting = !!activeTaskRef.current || showCCTVRef.current || showAdminRadarRef.current || showSabotageModalRef.current;
+          ctx.setTransform(canvasMetrics.dpr, 0, 0, canvasMetrics.dpr, 0, 0);
+          ctx.imageSmoothingEnabled = true;
+          const isInteracting =
+            !!activeTaskRef.current ||
+            showMinimapRef.current ||
+            showCCTVRef.current ||
+            showAdminRadarRef.current ||
+            showSabotageModalRef.current ||
+            !!activeKillOverlayRef.current ||
+            isTextEntryTarget(document.activeElement);
           const localP = localPlayerRef.current;
           const curSettings = settingsRef.current;
 
@@ -622,41 +707,68 @@ export function GameCanvas({
 
           // Security CCTV Console Proximity
           const distToSecurityDesk = Math.hypot(currentX - 640, currentY - 760);
-          setNearbySecurityDesk(distToSecurityDesk < 75 && localP.isAlive && !localP.inVent);
+          setNearbySecurityDesk(distToSecurityDesk < 75 && localP.isAlive && !localP.inVent && curActiveSab?.type !== 'comms');
 
           // Admin Radar Table Proximity
           const distToAdminTable = Math.hypot(currentX - 1490, currentY - 890);
-          setNearbyAdminTable(distToAdminTable < 80 && localP.isAlive && !localP.inVent);
+          setNearbyAdminTable(distToAdminTable < 80 && localP.isAlive && !localP.inVent && curActiveSab?.type !== 'comms');
 
           // Emergency Sabotage Fix Proximity (Both Consoles for O2 & Reactor)
           let nearbySab: SabotageType | null = null;
           if (curActiveSab && localP.isAlive && !localP.inVent) {
             if (curActiveSab.type === 'lights') {
               const d = Math.hypot(currentX - 760, currentY - 1080);
-              if (d < 85) nearbySab = 'lights';
+              if (
+                d < 85
+                && hasLineOfSight(currentX, currentY, 760, 1080, curLockedDoors)
+              ) nearbySab = 'lights';
             } else if (curActiveSab.type === 'reactor') {
               const dTop = Math.hypot(currentX - 100, currentY - 720);
               const dBottom = Math.hypot(currentX - 100, currentY - 920);
-              if (!(curActiveSab.reactorHands ?? []).includes(localPlayerId) && (dTop < 85 || dBottom < 85)) nearbySab = 'reactor';
+              const fixedStations = curActiveSab.reactorStations ?? [];
+              const canUseTop = dTop < 85
+                && !fixedStations.includes('reactor_top')
+                && hasLineOfSight(currentX, currentY, 100, 720, curLockedDoors);
+              const canUseBottom = dBottom < 85
+                && !fixedStations.includes('reactor_bottom')
+                && hasLineOfSight(currentX, currentY, 100, 920, curLockedDoors);
+              if (
+                !(curActiveSab.reactorHands ?? []).includes(localPlayerId)
+                && (canUseTop || canUseBottom)
+              ) {
+                nearbySab = 'reactor';
+              }
             } else if (curActiveSab.type === 'o2') {
               const dO2Room = Math.hypot(currentX - 1520, currentY - 620);
               const dAdminRoom = Math.hypot(currentX - 1590, currentY - 820);
               const fixedRooms = curActiveSab.o2FixedRooms ?? [];
-              if ((dO2Room < 85 && !fixedRooms.includes('O2')) || (dAdminRoom < 85 && !fixedRooms.includes('Admin'))) nearbySab = 'o2';
+              const canFixO2 = dO2Room < 85
+                && !fixedRooms.includes('O2')
+                && hasLineOfSight(currentX, currentY, 1520, 620, curLockedDoors);
+              const canFixAdmin = dAdminRoom < 85
+                && !fixedRooms.includes('Admin')
+                && hasLineOfSight(currentX, currentY, 1590, 820, curLockedDoors);
+              if (canFixO2 || canFixAdmin) nearbySab = 'o2';
             } else if (curActiveSab.type === 'comms') {
               const d = Math.hypot(currentX - 1450, currentY - 1350);
-              if (d < 85) nearbySab = 'comms';
+              if (
+                d < 85
+                && hasLineOfSight(currentX, currentY, 1450, 1350, curLockedDoors)
+              ) nearbySab = 'comms';
             }
           }
           setNearbyFixSabotage(nearbySab);
 
-          // Task Proximity (Living Crewmates and Dead Ghosts can do tasks)
+          // Comms disables task consoles and their navigation data until repaired.
           let foundTask: TaskDefinition | null = null;
-          if (!localP.inVent) {
+          if (!localP.inVent && curActiveSab?.type !== 'comms') {
             for (const t of ALL_TASKS) {
               if (localP.assignedTasks.includes(t.id) && !localP.completedTasks.includes(t.id)) {
                 const d = Math.hypot(currentX - t.x, currentY - t.y);
-                if (d < 75) {
+                if (
+                  d < 75
+                  && hasLineOfSight(currentX, currentY, t.x, t.y, curLockedDoors)
+                ) {
                   foundTask = t;
                   break;
                 }
@@ -665,15 +777,17 @@ export function GameCanvas({
           }
           setNearbyTask(foundTask);
 
-          // Dead Body Proximity. Bodies should remain reportable when their
-          // sprite overlaps a wall collider, so reporting uses close range
-          // instead of the stricter movement/vision line-of-sight raycast.
+          // Dead Body Proximity. Match the host's range and line-of-sight
+          // validation so the report control never advertises a rejected action.
           let foundBody: DeadBody | null = null;
           if (localP.isAlive && !localP.inVent) {
             for (const b of curDeadBodies) {
               if (b.reported) continue;
               const d = Math.hypot(currentX - b.x, currentY - b.y);
-              if (d <= REPORT_RANGE) {
+              if (
+                d <= REPORT_RANGE
+                && hasLineOfSight(currentX, currentY, b.x, b.y, curLockedDoors)
+              ) {
                 foundBody = b;
                 break;
               }
@@ -705,7 +819,10 @@ export function GameCanvas({
             } else {
               for (const v of VENTS) {
                 const d = Math.hypot(currentX - v.x, currentY - v.y);
-                if (d < 85) {
+                if (
+                  d < 85
+                  && hasLineOfSight(currentX, currentY, v.x, v.y, curLockedDoors)
+                ) {
                   foundVent = v;
                   break;
                 }
@@ -722,15 +839,18 @@ export function GameCanvas({
             }
           }
 
+          const renderedLocalPlayer: Player = {
+            ...localP,
+            x: currentX,
+            y: currentY,
+            facing: facingRef.current,
+            isMoving: wasMovingRef.current,
+            assignedTasks: curActiveSab?.type === 'comms' ? [] : localP.assignedTasks,
+          };
           const renderedPlayers: Record<string, Player> = {};
           for (const p of Object.values(curAllPlayers)) {
             if (p.id === localPlayerId) {
-              renderedPlayers[p.id] = {
-                ...localP,
-                x: currentX,
-                y: currentY,
-                facing: facingRef.current,
-              };
+              renderedPlayers[p.id] = renderedLocalPlayer;
             } else {
               if (!lerpedPositions.current[p.id]) {
                 lerpedPositions.current[p.id] = { x: p.x, y: p.y };
@@ -757,22 +877,22 @@ export function GameCanvas({
 
           // 4. Camera Offset (Centered on Local Player with close-up POV Zoom)
           const ZOOM = 1.35;
-          const viewX = currentX - (canvas.width / 2) / ZOOM;
-          const viewY = currentY - (canvas.height / 2) / ZOOM;
+          const viewX = currentX - (canvasMetrics.width / 2) / ZOOM;
+          const viewY = currentY - (canvasMetrics.height / 2) / ZOOM;
 
-          // 5. Render The Skeld Game World
+          // 5. Render the Nebula vessel game world
           drawTheSkeld(
             ctx,
             viewX,
             viewY,
-            canvas.width,
-            canvas.height,
-            { ...localP, x: currentX, y: currentY, facing: facingRef.current },
+            canvasMetrics.width,
+            canvasMetrics.height,
+            renderedLocalPlayer,
             renderedPlayers,
             curDeadBodies,
             activeTaskRef.current ? activeTaskRef.current.id : null,
             curActiveSab,
-            isSecurityCamActiveRef.current,
+            isSecurityCamActiveRef.current && curActiveSab?.type !== 'comms',
             curLockedDoors,
             ZOOM
           );
@@ -784,22 +904,56 @@ export function GameCanvas({
 
     animationFrameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [localPlayerId, emergencyCooldown]);
-
-  // Handle Resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (canvasRef.current) {
-        canvasRef.current.width = window.innerWidth;
-        canvasRef.current.height = window.innerHeight;
-      }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [localPlayerId, resizeCanvas]);
 
   const progressPercent = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+  const visibleProgressPercent = systemsDisabledByComms ? 0 : progressPercent;
+  const canUseAction = Boolean(
+    nearbyTask || nearbyEmergencyButton || nearbySecurityDesk || nearbyAdminTable || nearbyFixSabotage
+  );
+
+  const resetJoystick = useCallback(() => {
+    joystickVectorRef.current = { dx: 0, dy: 0, isMoving: false };
+  }, []);
+
+  const handleJoystickPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (controlMode !== 'joystick' || event.pointerType === 'mouse') return;
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture is not available in every embedded browser.
+      }
+    },
+    [controlMode]
+  );
+
+  const handleJoystickPointerRelease = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      resetJoystick();
+      try {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      } catch {
+        // Capture may already have been released by the browser.
+      }
+    },
+    [resetJoystick]
+  );
+
+  const handleJoystickPointerCancel = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      handleJoystickPointerRelease(event);
+      setJoystickResetKey((previous) => previous + 1);
+    },
+    [handleJoystickPointerRelease]
+  );
+
+  useEffect(() => {
+    resetJoystick();
+  }, [controlMode, resetJoystick]);
+
   const currentVent =
     localPlayer.inVent && localPlayer.ventId
       ? VENTS.find((v) => v.id === localPlayer.ventId)
@@ -823,15 +977,15 @@ export function GameCanvas({
       {activeSabotage && (
         <div className="absolute top-16 sm:top-20 inset-x-0 flex justify-center items-center pointer-events-none z-40 px-4">
           <div
-            className={`px-5 py-2.5 rounded-2xl border-2 shadow-2xl flex items-center gap-3 backdrop-blur-md animate-bounce ${
+            className={`px-5 py-2.5 rounded-2xl border-2 shadow-2xl flex items-center gap-3 backdrop-blur-md animate-bounce motion-reduce:animate-none ${
               activeSabotage.type === 'reactor' || activeSabotage.type === 'o2'
                 ? 'bg-red-950/90 border-red-500 text-red-300 shadow-red-500/30'
                 : 'bg-amber-950/90 border-amber-500 text-amber-300 shadow-amber-500/30'
             }`}
           >
-            {activeSabotage.type === 'reactor' && <Flame className="w-5 h-5 text-red-400 animate-pulse" />}
-            {activeSabotage.type === 'o2' && <AlertTriangle className="w-5 h-5 text-teal-400 animate-pulse" />}
-            {activeSabotage.type === 'lights' && <Zap className="w-5 h-5 text-amber-400 animate-pulse" />}
+            {activeSabotage.type === 'reactor' && <Flame className="w-5 h-5 text-red-400 animate-pulse motion-reduce:animate-none" />}
+            {activeSabotage.type === 'o2' && <AlertTriangle className="w-5 h-5 text-teal-400 animate-pulse motion-reduce:animate-none" />}
+            {activeSabotage.type === 'lights' && <Zap className="w-5 h-5 text-amber-400 animate-pulse motion-reduce:animate-none" />}
 
             <div className="font-mono text-xs sm:text-sm font-black uppercase tracking-wider">
               {activeSabotage.type === 'reactor' && `KRITISCH: REAKTOR MELTDOWN IN ${activeSabotage.countdown}s!`}
@@ -850,30 +1004,66 @@ export function GameCanvas({
           {/* Global Task Bar */}
           <div className="bg-slate-900/90 border border-slate-700 sm:border-2 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-xl backdrop-blur-sm">
             <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-mono font-bold uppercase text-slate-300 mb-1">
-              <span>GESAMTAUFGABEN</span>
-              <span className="text-emerald-400">{progressPercent}%</span>
+              <span>{systemsDisabledByComms ? 'SIGNAL GESTÖRT' : 'GESAMTAUFGABEN'}</span>
+              <span className={systemsDisabledByComms ? 'text-amber-400' : 'text-emerald-400'}>
+                {systemsDisabledByComms ? '--' : `${progressPercent}%`}
+              </span>
             </div>
-            <div className="w-full h-2.5 sm:h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+            <div
+              className="w-full h-2.5 sm:h-3 bg-slate-950 rounded-full border border-slate-800 overflow-hidden"
+              role="progressbar"
+              aria-label="Fortschritt der Gesamtaufgaben"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={systemsDisabledByComms ? undefined : progressPercent}
+            >
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
+                className={`h-full transition-all duration-300 motion-reduce:transition-none ${
+                  systemsDisabledByComms
+                    ? 'bg-amber-500/30'
+                    : 'bg-gradient-to-r from-emerald-500 to-green-400'
+                }`}
+                style={{ width: `${visibleProgressPercent}%` }}
               />
             </div>
           </div>
 
           {/* Assigned Tasks Card (Collapsible) */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-xl backdrop-blur-sm">
-            <div
-              onClick={() => setShowTasksList((prev) => !prev)}
-              className="flex justify-between items-center cursor-pointer text-[11px] sm:text-xs font-mono font-bold text-slate-300"
+            <button
+              type="button"
+              disabled={systemsDisabledByComms}
+              aria-expanded={!systemsDisabledByComms && showTasksList}
+              onClick={() => setShowTasksList((previous) => !previous)}
+              className={`flex w-full justify-between items-center text-[11px] sm:text-xs font-mono font-bold text-slate-300 ${
+                systemsDisabledByComms ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'
+              }`}
             >
-              <span className={localPlayer.role === 'impostor' ? 'text-red-400' : 'text-amber-400'}>
-                {localPlayer.role === 'impostor' ? '🔪 FAKE-TASKS' : '📋 AUFGABEN'}
+              <span
+                className={
+                  systemsDisabledByComms
+                    ? 'text-amber-400'
+                    : localPlayer.role === 'impostor'
+                    ? 'text-red-400'
+                    : 'text-amber-400'
+                }
+              >
+                {systemsDisabledByComms
+                  ? '📡 SIGNAL VERLOREN'
+                  : localPlayer.role === 'impostor'
+                  ? '🔪 FAKE-TASKS'
+                  : '📋 AUFGABEN'}
               </span>
-              {showTasksList ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </div>
+              {systemsDisabledByComms ? (
+                <AlertTriangle className="w-3.5 h-3.5" />
+              ) : showTasksList ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
 
-            {showTasksList && (
+            {showTasksList && !systemsDisabledByComms && (
               <div className="mt-2 space-y-1 text-[11px] sm:text-xs font-mono max-h-48 overflow-y-auto pr-1">
                 {localPlayer.assignedTasks.map((tId) => {
                   const taskDef = ALL_TASKS.find((t) => t.id === tId);
@@ -1005,9 +1195,16 @@ export function GameCanvas({
       )}
 
       {/* BOTTOM LEFT: Virtual Joystick */}
-      {controlMode !== 'none' && localPlayer.isAlive && !activeTask && !localPlayer.inVent && (
-        <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 z-30 select-none touch-none">
+      {controlMode !== 'none' && localPlayer.isAlive && !hasBlockingOverlay && !localPlayer.inVent && (
+        <div
+          className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 z-30 select-none touch-none"
+          onPointerDown={handleJoystickPointerDown}
+          onPointerUp={handleJoystickPointerRelease}
+          onPointerCancel={handleJoystickPointerCancel}
+          onLostPointerCapture={resetJoystick}
+        >
           <VirtualJoystick
+            key={`${controlMode}-${joystickResetKey}`}
             mode={controlMode}
             onMove={(dx, dy, isMoving) => {
               joystickVectorRef.current = { dx, dy, isMoving };
@@ -1113,7 +1310,7 @@ export function GameCanvas({
               handleUseAction();
             }
           }}
-          disabled={!nearbyTask && !nearbyEmergencyButton && !nearbySecurityDesk && !nearbyAdminTable && !nearbyFixSabotage || (nearbyEmergencyButton && emergencyCooldown > 0)}
+          disabled={!canUseAction || hasBlockingOverlay || (nearbyEmergencyButton && emergencyCooldown > 0)}
           className={`w-16 h-16 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl border-2 flex flex-col items-center justify-center font-mono font-black text-xs uppercase shadow-2xl transition-all cursor-pointer select-none touch-manipulation pointer-events-auto ${
             nearbyEmergencyButton
               ? emergencyCooldown > 0
@@ -1171,7 +1368,7 @@ export function GameCanvas({
       )}
 
       {/* CCTV Security Camera Monitor Modal */}
-      {showCCTV && (
+      {showCCTV && !systemsDisabledByComms && (
         <CCTVModal
           players={players}
           deadBodies={deadBodies}
@@ -1181,7 +1378,7 @@ export function GameCanvas({
       )}
 
       {/* Admin Table Radar Modal */}
-      {showAdminRadar && (
+      {showAdminRadar && !systemsDisabledByComms && (
         <AdminTableModal
           players={players}
           deadBodies={deadBodies}
@@ -1201,7 +1398,7 @@ export function GameCanvas({
       )}
 
       {/* Task Minigame Modal */}
-      {activeTask && (
+      {activeTask && !systemsDisabledByComms && (
         <TaskModal
           task={activeTask}
           playerColor={localPlayer.color}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Trash2, Check, ArrowDown } from 'lucide-react';
+import { Trash2, ArrowDown } from 'lucide-react';
 import { sound } from '@/lib/sound';
 
 interface EmptyGarbageTaskProps {

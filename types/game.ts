@@ -138,6 +138,8 @@ export interface Player {
   votedFor?: string | 'skip' | null;
   hasVoted?: boolean;
   killCooldown?: number;
+  /** Host-authoritative epoch timestamp for the next permitted kill. */
+  killAvailableAt?: number;
   inVent?: boolean;
   ventId?: string;
   isBot?: boolean;
@@ -235,7 +237,8 @@ export interface ActiveSabotage {
   requiredFixes?: number;
   currentFixes?: number;
   fixedSwitches?: boolean[]; // For lights (5 switches)
-  reactorHands?: string[]; // Player IDs holding hand scanners
+  reactorHands?: string[]; // Player IDs that completed a hand scanner
+  reactorStations?: string[]; // Distinct scanner IDs already completed
   o2FixedRooms?: string[]; // ['O2', 'Admin']
 }
 
@@ -257,8 +260,13 @@ export interface GameState {
   completedTasksCount?: number;
   activeSabotage?: ActiveSabotage | null;
   sabotageCooldown?: number;
+  /** Host-authoritative epoch timestamp for the next permitted sabotage. */
+  sabotageAvailableAt?: number;
+  /** Host-authoritative epoch timestamp for the next permitted door lock. */
+  doorAvailableAt?: number;
   lockedDoors?: Record<string, number>; // Room name -> unlock timestamp
   isSecurityCamActive?: boolean;
+  securityCamViewers?: string[];
 }
 
 // Network Message Types
@@ -281,7 +289,7 @@ export type NetworkMessage =
   | { type: 'COMPLETE_TASK'; playerId: string; taskId: string }
   | { type: 'VENT_ACTION'; playerId: string; ventId: string; action: 'enter' | 'exit' | 'travel'; targetVentId?: string }
   | { type: 'TRIGGER_SABOTAGE'; sabotageType: SabotageType }
-  | { type: 'FIX_SABOTAGE'; sabotageType: SabotageType; fixerId: string; payload?: any }
+  | { type: 'FIX_SABOTAGE'; sabotageType: SabotageType; fixerId: string; payload?: unknown }
   | { type: 'LOCK_DOORS'; room: string }
   | { type: 'SECURITY_CAM_TOGGLE'; active: boolean; isActive?: boolean; viewerId?: string }
   | { type: 'PLAY_AGAIN' };

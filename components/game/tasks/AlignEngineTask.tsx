@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Gauge, Check, ArrowRight } from 'lucide-react';
+import { Gauge, ArrowRight } from 'lucide-react';
 import { sound } from '@/lib/sound';
 
 interface AlignEngineTaskProps {

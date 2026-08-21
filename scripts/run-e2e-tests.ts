@@ -1,6 +1,7 @@
 /**
- * Automated E2E Test Runner for Among Us ("The Skeld") Web Replica
- * Validates Tiers 1 through 4 (448+ Total Test Cases)
+ * Automated in-process logic test runner for Nebula Deception.
+ *
+ * Validates game rules and state transitions; this is not browser or network E2E coverage.
  */
 
 import { TestRunner } from '../tests/test-framework';
@@ -11,8 +12,8 @@ import { registerTier4Tests } from '../tests/e2e/tier4-scenarios.test';
 
 async function main() {
   console.log('\n================================================================================');
-  console.log('🚀 AMONG US ("THE SKELD") — AUTOMATED E2E TEST SUITE RUNNER');
-  console.log('   Framework: TypeScript / Next.js / Canvas 2D Engine / WebRTC Relay');
+  console.log('🚀 NEBULA DECEPTION — AUTOMATED LOGIC TEST SUITE');
+  console.log('   Harness: TypeScript / in-process game rules and state transitions');
   console.log('================================================================================\n');
 
   const runner = new TestRunner();
@@ -27,6 +28,7 @@ async function main() {
   const startTime = Date.now();
   const { results, stats } = await runner.run();
   const totalDuration = Date.now() - startTime;
+  const passRate = stats.total === 0 ? 0 : (stats.passed / stats.total) * 100;
 
   // Print results
   console.log('--------------------------------------------------------------------------------');
@@ -37,7 +39,7 @@ async function main() {
     1: 'Tier 1: Feature Coverage (All 40 Features)',
     2: 'Tier 2: Boundary & Corner Cases (All 40 Features)',
     3: 'Tier 3: Pairwise Cross-Feature Interactions',
-    4: 'Tier 4: Real-World Application Match Scenarios',
+    4: 'Tier 4: Full-Lifecycle State Simulations',
   };
 
   for (let tier = 1; tier <= 4; tier++) {
@@ -51,7 +53,7 @@ async function main() {
   console.log('--------------------------------------------------------------------------------');
   console.log('🏁 TOTAL TEST SUITE METRICS:');
   console.log(`   Total Tests Executed : ${stats.total}`);
-  console.log(`   Tests Passed         : ${stats.passed} (100.0%)`);
+  console.log(`   Tests Passed         : ${stats.passed} (${passRate.toFixed(1)}%)`);
   console.log(`   Tests Failed         : ${stats.failed}`);
   console.log(`   Execution Time       : ${(totalDuration / 1000).toFixed(3)}s`);
   console.log('================================================================================\n');
@@ -68,7 +70,7 @@ async function main() {
     }
     process.exit(1);
   } else {
-    console.log('🎉 ALL 448 TEST CASES PASSED WITH 100% PASS RATE! E2E SUITE VERIFIED.\n');
+    console.log(`🎉 ALL ${stats.total} LOGIC TESTS PASSED (${passRate.toFixed(1)}%).\n`);
     process.exit(0);
   }
 }

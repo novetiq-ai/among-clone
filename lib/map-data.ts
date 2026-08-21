@@ -30,8 +30,8 @@ export interface WallBox {
 export const MAP_WIDTH = 2400;
 export const MAP_HEIGHT = 1600;
 
-export const SPAWN_POSITION = { x: 1200, y: 480 };
-export const EMERGENCY_BUTTON_POS = { x: 1200, y: 500, radius: 48 };
+export const SPAWN_POSITION = { x: 1200, y: 410 };
+export const EMERGENCY_BUTTON_POS = { x: 1200, y: 500, radius: 72 };
 
 // Designated safe spawn slots around the Cafeteria meeting table (away from collision bounds)
 export const SPAWN_SLOTS = [
@@ -40,8 +40,8 @@ export const SPAWN_SLOTS = [
   { x: 1300, y: 440 }, // Top-Right
   { x: 1040, y: 500 }, // Left
   { x: 1360, y: 500 }, // Right
-  { x: 1100, y: 580 }, // Bottom-Left
-  { x: 1300, y: 580 }, // Bottom-Right
+  { x: 1120, y: 580 }, // Bottom-Left
+  { x: 1280, y: 580 }, // Bottom-Right
   { x: 1200, y: 620 }, // Bottom
   { x: 1150, y: 410 },
   { x: 1250, y: 410 },
@@ -53,7 +53,7 @@ export function getSpawnPosition(index: number) {
   return SPAWN_SLOTS[index % SPAWN_SLOTS.length] || SPAWN_POSITION;
 }
 
-// 14 Skeld Rooms matching the authentic Among Us blueprint
+// Fourteen-room Nebula vessel layout
 export const ROOMS: RoomArea[] = [
   // 1. Cafeteria (Large Center-Top room)
   { id: 'cafeteria', name: 'Cafeteria', x: 960, y: 280, width: 480, height: 440, color: '#263040' },
@@ -68,7 +68,7 @@ export const ROOMS: RoomArea[] = [
   // 6. Communications (Bottom-Center room)
   { id: 'communications', name: 'Communications', x: 1280, y: 1240, width: 240, height: 180, color: '#252d38' },
   // 7. Storage (Large Bottom-Center room)
-  { id: 'storage', name: 'Storage', x: 920, y: 960, width: 380, height: 380, color: '#2a3040' },
+  { id: 'storage', name: 'Storage', x: 920, y: 960, width: 360, height: 380, color: '#2a3040' },
   // 8. Admin (Right of Central Hallway, below Cafeteria)
   { id: 'admin', name: 'Admin', x: 1340, y: 780, width: 300, height: 220, color: '#242c38' },
   // 9. Electrical (Below Security, left of Storage)
@@ -82,7 +82,7 @@ export const ROOMS: RoomArea[] = [
   // 13. Upper Engine (Top-Left Engine Pod)
   { id: 'upper_engine', name: 'Upper Engine', x: 240, y: 320, width: 320, height: 280, color: '#222c3a' },
   // 14. MedBay (Below Upper Hallway, above Security)
-  { id: 'medbay', name: 'MedBay', x: 680, y: 500, width: 260, height: 260, color: '#1a2a26' },
+  { id: 'medbay', name: 'MedBay', x: 680, y: 500, width: 260, height: 220, color: '#1a2a26' },
 ];
 
 // Hallways seamlessly connecting all rooms
@@ -175,7 +175,7 @@ export const ALL_TASKS: TaskDefinition[] = [
 // Impostor Vents: Authentic 14-Vent Skeld Network from reference diagram
 export const VENTS: VentDefinition[] = [
   // Triangle 1: MedBay <-> Security <-> Electrical
-  { id: 'vent-medbay', room: 'MedBay', x: 720, y: 710, connectedVents: ['vent-security', 'vent-electrical'] },
+  { id: 'vent-medbay', room: 'MedBay', x: 760, y: 660, connectedVents: ['vent-security', 'vent-electrical'] },
   { id: 'vent-security', room: 'Security', x: 630, y: 870, connectedVents: ['vent-medbay', 'vent-electrical'] },
   { id: 'vent-electrical', room: 'Electrical', x: 680, y: 970, connectedVents: ['vent-medbay', 'vent-security'] },
 
@@ -185,11 +185,11 @@ export const VENTS: VentDefinition[] = [
   { id: 'vent-hallway-shields', room: 'Flur (O2/Shields)', x: 1720, y: 680, connectedVents: ['vent-cafeteria', 'vent-admin'] },
 
   // Pair 3: Reactor Top <-> Upper Engine
-  { id: 'vent-reactor-top', room: 'Reactor (Oben)', x: 110, y: 690, connectedVents: ['vent-upper-engine'] },
+  { id: 'vent-reactor-top', room: 'Reactor (Oben)', x: 150, y: 700, connectedVents: ['vent-upper-engine'] },
   { id: 'vent-upper-engine', room: 'Upper Engine', x: 290, y: 370, connectedVents: ['vent-reactor-top'] },
 
   // Pair 4: Reactor Bottom <-> Lower Engine
-  { id: 'vent-reactor-bottom', room: 'Reactor (Unten)', x: 110, y: 950, connectedVents: ['vent-lower-engine'] },
+  { id: 'vent-reactor-bottom', room: 'Reactor (Unten)', x: 150, y: 940, connectedVents: ['vent-lower-engine'] },
   { id: 'vent-lower-engine', room: 'Lower Engine', x: 290, y: 1270, connectedVents: ['vent-reactor-bottom'] },
 
   // Pair 5: Weapons <-> Navigation Top
@@ -588,7 +588,7 @@ export function resolvePlayerMovement(
 
   // Anti-trap pushout: If somehow inside a wall, nudge towards nearest safe position
   if (checkCollision(px, py, radius - 2, false, lockedDoors)) {
-    const safePos = getNearestSafePosition(px, py);
+    const safePos = getNearestSafePosition(px, py, lockedDoors, radius);
     px = safePos.x;
     py = safePos.y;
   }
@@ -603,18 +603,39 @@ export function resolvePlayerMovement(
 /**
  * Safe pushout for players caught in a collider (e.g. after emergency meeting spawn)
  */
-export function getNearestSafePosition(x: number, y: number): { x: number; y: number } {
-  // Test radial directions in 10px rings up to 60px
-  for (let dist = 10; dist <= 60; dist += 10) {
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-      const testX = x + Math.cos(a) * dist;
-      const testY = y + Math.sin(a) * dist;
-      if (!checkCollision(testX, testY, 14, false)) {
-        return { x: testX, y: testY };
+export function getNearestSafePosition(
+  x: number,
+  y: number,
+  lockedDoors?: Record<string, number>,
+  radius = 16
+): { x: number; y: number } {
+  const originX = Math.max(60, Math.min(MAP_WIDTH - 60, x));
+  const originY = Math.max(280, Math.min(MAP_HEIGHT - 120, y));
+
+  if (!checkCollision(originX, originY, radius, false, lockedDoors)) {
+    return { x: originX, y: originY };
+  }
+
+  for (let distance = 10; distance <= 240; distance += 10) {
+    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
+      const candidateX = Math.max(
+        60,
+        Math.min(MAP_WIDTH - 60, originX + Math.cos(angle) * distance)
+      );
+      const candidateY = Math.max(
+        280,
+        Math.min(MAP_HEIGHT - 120, originY + Math.sin(angle) * distance)
+      );
+      if (!checkCollision(candidateX, candidateY, radius, false, lockedDoors)) {
+        return { x: candidateX, y: candidateY };
       }
     }
   }
-  return SPAWN_POSITION;
+
+  const safeSpawn = SPAWN_SLOTS.find(
+    (slot) => !checkCollision(slot.x, slot.y, radius, false, lockedDoors)
+  );
+  return safeSpawn ? { ...safeSpawn } : { ...SPAWN_POSITION };
 }
 
 export function getCurrentRoomName(x: number, y: number): string {
@@ -654,7 +675,7 @@ export interface Waypoint {
 
 export const WAYPOINTS: Waypoint[] = [
   // Cafeteria
-  { id: 'wp-caf-center', x: 1200, y: 480, room: 'Cafeteria', neighbors: ['wp-caf-nw', 'wp-caf-ne', 'wp-caf-s'] },
+  { id: 'wp-caf-center', x: 1200, y: 430, room: 'Cafeteria', neighbors: ['wp-caf-nw', 'wp-caf-ne', 'wp-caf-s'] },
   { id: 'wp-caf-nw', x: 1040, y: 450, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-upper-hall-e'] },
   { id: 'wp-caf-ne', x: 1360, y: 430, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-caf-weap'] },
   { id: 'wp-caf-s', x: 1200, y: 680, room: 'Cafeteria', neighbors: ['wp-caf-center', 'wp-center-hall'] },
@@ -671,7 +692,7 @@ export const WAYPOINTS: Waypoint[] = [
 
   // West Cross Junction
   { id: 'wp-west-cross-mid', x: 400, y: 810, room: 'Reaktor-Kreuzung', neighbors: ['wp-upper-engine-s', 'wp-lower-engine-n', 'wp-reactor', 'wp-security'] },
-  { id: 'wp-reactor', x: 180, y: 810, room: 'Reactor', neighbors: ['wp-west-cross-mid'] },
+  { id: 'wp-reactor', x: 240, y: 810, room: 'Reactor', neighbors: ['wp-west-cross-mid'] },
   { id: 'wp-security', x: 660, y: 810, room: 'Security', neighbors: ['wp-west-cross-mid'] },
 
   // Lower Engine
@@ -681,19 +702,19 @@ export const WAYPOINTS: Waypoint[] = [
   // Lower Hallway & Electrical
   { id: 'wp-lower-hall-w', x: 640, y: 1250, room: 'Unterer Flur', neighbors: ['wp-lower-engine-e', 'wp-lower-hall-m'] },
   { id: 'wp-lower-hall-m', x: 760, y: 1250, room: 'Unterer Flur', neighbors: ['wp-lower-hall-w', 'wp-electrical', 'wp-lower-hall-e'] },
-  { id: 'wp-electrical', x: 760, y: 1040, room: 'Electrical', neighbors: ['wp-lower-hall-m'] },
+  { id: 'wp-electrical', x: 760, y: 1090, room: 'Electrical', neighbors: ['wp-lower-hall-m'] },
   { id: 'wp-lower-hall-e', x: 880, y: 1250, room: 'Unterer Flur', neighbors: ['wp-lower-hall-m', 'wp-storage-w'] },
 
   // Storage
   { id: 'wp-storage-w', x: 1000, y: 1250, room: 'Storage', neighbors: ['wp-lower-hall-e', 'wp-storage-center'] },
-  { id: 'wp-storage-center', x: 1110, y: 1100, room: 'Storage', neighbors: ['wp-storage-w', 'wp-storage-n', 'wp-storage-e', 'wp-storage-s'] },
+  { id: 'wp-storage-center', x: 1160, y: 1210, room: 'Storage', neighbors: ['wp-storage-w', 'wp-storage-n', 'wp-storage-e', 'wp-storage-s'] },
   { id: 'wp-storage-n', x: 1200, y: 1000, room: 'Storage', neighbors: ['wp-storage-center', 'wp-center-hall'] },
   { id: 'wp-storage-e', x: 1260, y: 1150, room: 'Storage', neighbors: ['wp-storage-center', 'wp-stor-shields-m'] },
   { id: 'wp-storage-s', x: 1200, y: 1300, room: 'Storage', neighbors: ['wp-storage-center'] },
 
   // Central Hallway & Admin
   { id: 'wp-center-hall', x: 1200, y: 850, room: 'Zentralflur', neighbors: ['wp-caf-s', 'wp-storage-n', 'wp-admin'] },
-  { id: 'wp-admin', x: 1460, y: 880, room: 'Admin', neighbors: ['wp-center-hall'] },
+  { id: 'wp-admin', x: 1400, y: 880, room: 'Admin', neighbors: ['wp-center-hall'] },
 
   // Communications & Shields-Storage Hallway
   { id: 'wp-stor-shields-m', x: 1400, y: 1150, room: 'Flur (Storage ➔ Shields)', neighbors: ['wp-storage-e', 'wp-comms', 'wp-shields-w'] },
@@ -701,20 +722,20 @@ export const WAYPOINTS: Waypoint[] = [
   { id: 'wp-shields-w', x: 1680, y: 1150, room: 'Shields', neighbors: ['wp-stor-shields-m', 'wp-shields-center'] },
 
   // Shields
-  { id: 'wp-shields-center', x: 1770, y: 1170, room: 'Shields', neighbors: ['wp-shields-w', 'wp-east-hub-s', 'wp-shields-e'] },
+  { id: 'wp-shields-center', x: 1820, y: 1090, room: 'Shields', neighbors: ['wp-shields-w', 'wp-east-hub-s', 'wp-shields-e'] },
   { id: 'wp-shields-e', x: 1880, y: 1150, room: 'Shields', neighbors: ['wp-shields-center', 'wp-nav-s'] },
 
   // Weapons & East Hub
   { id: 'wp-caf-weap', x: 1500, y: 420, room: 'Flur (Cafeteria ➔ Weapons)', neighbors: ['wp-caf-ne', 'wp-weapons'] },
   { id: 'wp-weapons', x: 1680, y: 420, room: 'Weapons', neighbors: ['wp-caf-weap', 'wp-east-hub-n'] },
-  { id: 'wp-east-hub-n', x: 1690, y: 600, room: 'Östlicher Flur', neighbors: ['wp-weapons', 'wp-o2', 'wp-east-hub-mid'] },
-  { id: 'wp-o2', x: 1560, y: 670, room: 'O2', neighbors: ['wp-east-hub-n'] },
-  { id: 'wp-east-hub-mid', x: 1690, y: 710, room: 'Östlicher Flur', neighbors: ['wp-east-hub-n', 'wp-nav-n', 'wp-east-hub-s'] },
+  { id: 'wp-east-hub-n', x: 1705, y: 600, room: 'Östlicher Flur', neighbors: ['wp-weapons', 'wp-o2', 'wp-east-hub-mid'] },
+  { id: 'wp-o2', x: 1600, y: 670, room: 'O2', neighbors: ['wp-east-hub-n'] },
+  { id: 'wp-east-hub-mid', x: 1705, y: 710, room: 'Östlicher Flur', neighbors: ['wp-east-hub-n', 'wp-nav-n', 'wp-east-hub-s'] },
   { id: 'wp-east-hub-s', x: 1690, y: 980, room: 'Östlicher Flur', neighbors: ['wp-east-hub-mid', 'wp-shields-center'] },
 
   // Navigation
   { id: 'wp-nav-n', x: 2060, y: 710, room: 'Navigation', neighbors: ['wp-east-hub-mid', 'wp-nav-center'] },
-  { id: 'wp-nav-s', x: 2000, y: 920, room: 'Navigation', neighbors: ['wp-shields-e', 'wp-nav-center'] },
+  { id: 'wp-nav-s', x: 2000, y: 900, room: 'Navigation', neighbors: ['wp-shields-e', 'wp-nav-center'] },
   { id: 'wp-nav-center', x: 2160, y: 780, room: 'Navigation', neighbors: ['wp-nav-n', 'wp-nav-s'] },
 ];
 
@@ -734,61 +755,389 @@ export function getNearestWaypoint(x: number, y: number): Waypoint {
   return closest;
 }
 
+const NAV_GRID_SIZE = 20;
+const NAV_AGENT_RADIUS = 16;
+const NAV_MIN_X = 60;
+const NAV_MAX_X = MAP_WIDTH - 60;
+const NAV_MIN_Y = 280;
+const NAV_MAX_Y = MAP_HEIGHT - 120;
+const NAV_COLUMNS = Math.floor((NAV_MAX_X - NAV_MIN_X) / NAV_GRID_SIZE) + 1;
+const NAV_ROWS = Math.floor((NAV_MAX_Y - NAV_MIN_Y) / NAV_GRID_SIZE) + 1;
+
+interface NavGridPoint {
+  column: number;
+  row: number;
+  x: number;
+  y: number;
+}
+
+interface NavQueueEntry {
+  key: string;
+  priority: number;
+}
+
+function navKey(column: number, row: number): string {
+  return column + ',' + row;
+}
+
+function navPoint(column: number, row: number): NavGridPoint {
+  return {
+    column,
+    row,
+    x: NAV_MIN_X + column * NAV_GRID_SIZE,
+    y: NAV_MIN_Y + row * NAV_GRID_SIZE,
+  };
+}
+
+function hasWalkablePathSegment(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  lockedDoors?: Record<string, number>
+): boolean {
+  const distance = Math.hypot(toX - fromX, toY - fromY);
+  const steps = Math.max(1, Math.ceil(distance / 6));
+  for (let step = 0; step <= steps; step++) {
+    const progress = step / steps;
+    if (
+      checkCollision(
+        fromX + (toX - fromX) * progress,
+        fromY + (toY - fromY) * progress,
+        NAV_AGENT_RADIUS,
+        false,
+        lockedDoors
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function nearestReachableGridPoint(
+  x: number,
+  y: number,
+  lockedDoors?: Record<string, number>
+): NavGridPoint | null {
+  const centerColumn = Math.max(
+    0,
+    Math.min(NAV_COLUMNS - 1, Math.round((x - NAV_MIN_X) / NAV_GRID_SIZE))
+  );
+  const centerRow = Math.max(
+    0,
+    Math.min(NAV_ROWS - 1, Math.round((y - NAV_MIN_Y) / NAV_GRID_SIZE))
+  );
+  const maximumRadius = Math.max(NAV_COLUMNS, NAV_ROWS);
+
+  for (let radius = 0; radius <= maximumRadius; radius++) {
+    const minimumColumn = Math.max(0, centerColumn - radius);
+    const maximumColumn = Math.min(NAV_COLUMNS - 1, centerColumn + radius);
+    const minimumRow = Math.max(0, centerRow - radius);
+    const maximumRow = Math.min(NAV_ROWS - 1, centerRow + radius);
+    let nearest: NavGridPoint | null = null;
+    let nearestDistance = Infinity;
+
+    for (let row = minimumRow; row <= maximumRow; row++) {
+      for (let column = minimumColumn; column <= maximumColumn; column++) {
+        if (
+          radius > 0
+          && column !== minimumColumn
+          && column !== maximumColumn
+          && row !== minimumRow
+          && row !== maximumRow
+        ) {
+          continue;
+        }
+
+        const point = navPoint(column, row);
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (
+          distance >= nearestDistance
+          || checkCollision(point.x, point.y, NAV_AGENT_RADIUS, false, lockedDoors)
+          || !hasWalkablePathSegment(x, y, point.x, point.y, lockedDoors)
+        ) {
+          continue;
+        }
+
+        nearest = point;
+        nearestDistance = distance;
+      }
+    }
+
+    if (nearest) return nearest;
+  }
+
+  return null;
+}
+
+function pushNavQueue(heap: NavQueueEntry[], entry: NavQueueEntry): void {
+  heap.push(entry);
+  let index = heap.length - 1;
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2);
+    if (heap[parent].priority <= entry.priority) break;
+    heap[index] = heap[parent];
+    index = parent;
+  }
+  heap[index] = entry;
+}
+
+function popNavQueue(heap: NavQueueEntry[]): NavQueueEntry | undefined {
+  if (heap.length === 0) return undefined;
+  const first = heap[0];
+  const last = heap.pop();
+  if (!last || heap.length === 0) return first;
+
+  let index = 0;
+  while (true) {
+    const left = index * 2 + 1;
+    const right = left + 1;
+    if (left >= heap.length) break;
+    const child =
+      right < heap.length && heap[right].priority < heap[left].priority
+        ? right
+        : left;
+    if (heap[child].priority >= last.priority) break;
+    heap[index] = heap[child];
+    index = child;
+  }
+  heap[index] = last;
+  return first;
+}
+
+function simplifyGridPath(
+  points: NavGridPoint[],
+  startX: number,
+  startY: number,
+  lockedDoors?: Record<string, number>
+): NavGridPoint[] {
+  const simplified: NavGridPoint[] = [];
+  let anchorX = startX;
+  let anchorY = startY;
+  let index = 0;
+
+  while (index < points.length) {
+    let furthest = index;
+    for (let candidate = points.length - 1; candidate >= index; candidate--) {
+      const point = points[candidate];
+      if (
+        hasWalkablePathSegment(
+          anchorX,
+          anchorY,
+          point.x,
+          point.y,
+          lockedDoors
+        )
+      ) {
+        furthest = candidate;
+        break;
+      }
+    }
+
+    const selected = points[furthest];
+    simplified.push(selected);
+    anchorX = selected.x;
+    anchorY = selected.y;
+    index = furthest + 1;
+  }
+
+  return simplified;
+}
+
 /**
- * Dijkstra Pathfinding between waypoints for Bot navigation
+ * Collider- and door-aware A* pathfinding. A reachable exact target (or the
+ * closest safe point around a terminal) is always appended to the returned path.
  */
-export function findBotPath(startX: number, startY: number, targetX: number, targetY: number): Waypoint[] {
-  const startWp = getNearestWaypoint(startX, startY);
-  const targetWp = getNearestWaypoint(targetX, targetY);
+export function findBotPath(
+  startX: number,
+  startY: number,
+  targetX: number,
+  targetY: number,
+  lockedDoors?: Record<string, number>
+): Waypoint[] {
+  const start = checkCollision(startX, startY, NAV_AGENT_RADIUS, false, lockedDoors)
+    ? getNearestSafePosition(startX, startY, lockedDoors, NAV_AGENT_RADIUS)
+    : { x: startX, y: startY };
+  const target = checkCollision(targetX, targetY, NAV_AGENT_RADIUS, false, lockedDoors)
+    ? getNearestSafePosition(targetX, targetY, lockedDoors, NAV_AGENT_RADIUS)
+    : { x: targetX, y: targetY };
 
-  if (startWp.id === targetWp.id) return [targetWp];
-
-  const distances: Record<string, number> = {};
-  const previous: Record<string, string | null> = {};
-  const unvisited = new Set<string>();
-
-  for (const wp of WAYPOINTS) {
-    distances[wp.id] = Infinity;
-    previous[wp.id] = null;
-    unvisited.add(wp.id);
+  if (
+    hasWalkablePathSegment(start.x, start.y, target.x, target.y, lockedDoors)
+  ) {
+    return [
+      {
+        id: 'target-' + Math.round(target.x) + '-' + Math.round(target.y),
+        x: target.x,
+        y: target.y,
+        room: getCurrentRoomName(targetX, targetY),
+        neighbors: [],
+      },
+    ];
   }
-  distances[startWp.id] = 0;
 
-  while (unvisited.size > 0) {
-    let currentId: string | null = null;
-    let shortest = Infinity;
+  const startGrid = nearestReachableGridPoint(start.x, start.y, lockedDoors);
+  const targetGrid = nearestReachableGridPoint(target.x, target.y, lockedDoors);
+  if (!startGrid || !targetGrid) return [];
 
-    for (const id of unvisited) {
-      if (distances[id] < shortest) {
-        shortest = distances[id];
-        currentId = id;
-      }
+  const walkableGridPoints = new Map<string, boolean>();
+  const walkableGridEdges = new Map<string, boolean>();
+  const isWalkableGridPoint = (point: NavGridPoint) => {
+    const key = navKey(point.column, point.row);
+    const cached = walkableGridPoints.get(key);
+    if (cached !== undefined) return cached;
+    const walkable = !checkCollision(
+      point.x,
+      point.y,
+      NAV_AGENT_RADIUS,
+      false,
+      lockedDoors
+    );
+    walkableGridPoints.set(key, walkable);
+    return walkable;
+  };
+  const hasWalkableGridEdge = (from: NavGridPoint, to: NavGridPoint) => {
+    const fromKey = navKey(from.column, from.row);
+    const toKey = navKey(to.column, to.row);
+    const key = fromKey < toKey ? fromKey + ':' + toKey : toKey + ':' + fromKey;
+    const cached = walkableGridEdges.get(key);
+    if (cached !== undefined) return cached;
+    const walkable = hasWalkablePathSegment(
+      from.x,
+      from.y,
+      to.x,
+      to.y,
+      lockedDoors
+    );
+    walkableGridEdges.set(key, walkable);
+    return walkable;
+  };
+
+  const startKey = navKey(startGrid.column, startGrid.row);
+  const targetKey = navKey(targetGrid.column, targetGrid.row);
+  const queue: NavQueueEntry[] = [];
+  const closed = new Set<string>();
+  const cameFrom = new Map<string, string>();
+  const scores = new Map<string, number>([[startKey, 0]]);
+  pushNavQueue(queue, {
+    key: startKey,
+    priority: Math.hypot(
+      targetGrid.column - startGrid.column,
+      targetGrid.row - startGrid.row
+    ),
+  });
+
+  const directions = [
+    [-1, -1],
+    [0, -1],
+    [1, -1],
+    [-1, 0],
+    [1, 0],
+    [-1, 1],
+    [0, 1],
+    [1, 1],
+  ];
+
+  let reachedTarget = false;
+  while (queue.length > 0) {
+    const currentEntry = popNavQueue(queue);
+    if (!currentEntry || closed.has(currentEntry.key)) continue;
+    if (currentEntry.key === targetKey) {
+      reachedTarget = true;
+      break;
     }
 
-    if (!currentId || shortest === Infinity) break;
-    if (currentId === targetWp.id) break;
+    closed.add(currentEntry.key);
+    const [currentColumn, currentRow] = currentEntry.key.split(',').map(Number);
+    const currentPoint = navPoint(currentColumn, currentRow);
+    const currentScore = scores.get(currentEntry.key) ?? Infinity;
 
-    unvisited.delete(currentId);
-    const currentWp = WAYPOINTS.find((w) => w.id === currentId)!;
-
-    for (const neighborId of currentWp.neighbors) {
-      if (!unvisited.has(neighborId)) continue;
-      const neighborWp = WAYPOINTS.find((w) => w.id === neighborId)!;
-      const weight = Math.hypot(currentWp.x - neighborWp.x, currentWp.y - neighborWp.y);
-      const alt = distances[currentId] + weight;
-      if (alt < distances[neighborId]) {
-        distances[neighborId] = alt;
-        previous[neighborId] = currentId;
+    for (const [columnOffset, rowOffset] of directions) {
+      const column = currentColumn + columnOffset;
+      const row = currentRow + rowOffset;
+      if (
+        column < 0 ||
+        column >= NAV_COLUMNS ||
+        row < 0 ||
+        row >= NAV_ROWS
+      ) {
+        continue;
       }
+
+      const point = navPoint(column, row);
+      if (
+        !isWalkableGridPoint(point)
+        || !hasWalkableGridEdge(currentPoint, point)
+      ) {
+        continue;
+      }
+
+      const key = navKey(column, row);
+      if (closed.has(key)) continue;
+      const stepCost = Math.hypot(columnOffset, rowOffset);
+      const tentativeScore = currentScore + stepCost;
+      if (tentativeScore >= (scores.get(key) ?? Infinity)) continue;
+
+      cameFrom.set(key, currentEntry.key);
+      scores.set(key, tentativeScore);
+      pushNavQueue(queue, {
+        key,
+        priority:
+          tentativeScore +
+          Math.hypot(targetGrid.column - column, targetGrid.row - row),
+      });
     }
   }
 
-  const path: Waypoint[] = [];
-  let curr: string | null = targetWp.id;
-  while (curr) {
-    const wp = WAYPOINTS.find((w) => w.id === curr);
-    if (wp) path.unshift(wp);
-    curr = previous[curr];
+  if (!reachedTarget) return [];
+
+  const reversedKeys = [targetKey];
+  while (reversedKeys[reversedKeys.length - 1] !== startKey) {
+    const previous = cameFrom.get(reversedKeys[reversedKeys.length - 1]);
+    if (!previous) return [];
+    reversedKeys.push(previous);
   }
+  reversedKeys.reverse();
+
+  const gridPoints = reversedKeys.map((key) => {
+    const [column, row] = key.split(',').map(Number);
+    return navPoint(column, row);
+  });
+  const simplified = simplifyGridPath(
+    gridPoints,
+    start.x,
+    start.y,
+    lockedDoors
+  );
+
+  const path: Waypoint[] = simplified.map((point) => ({
+    id: 'nav-' + point.column + '-' + point.row,
+    x: point.x,
+    y: point.y,
+    room: getCurrentRoomName(point.x, point.y),
+    neighbors: [],
+  }));
+  const last = path[path.length - 1];
+
+  if (
+    (!last || last.x !== target.x || last.y !== target.y) &&
+    hasWalkablePathSegment(
+      last?.x ?? start.x,
+      last?.y ?? start.y,
+      target.x,
+      target.y,
+      lockedDoors
+    )
+  ) {
+    path.push({
+      id: 'target-' + Math.round(target.x) + '-' + Math.round(target.y),
+      x: target.x,
+      y: target.y,
+      room: getCurrentRoomName(targetX, targetY),
+      neighbors: [],
+    });
+  }
+
   return path;
 }

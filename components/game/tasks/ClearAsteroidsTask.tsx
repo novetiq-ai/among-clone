@@ -24,6 +24,9 @@ interface LaserFlash {
   id: number;
   targetX: number;
   targetY: number;
+  originLeftX: number;
+  originRightX: number;
+  originY: number;
 }
 
 interface Explosion {
@@ -51,12 +54,13 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
   const [crosshairPos, setCrosshairPos] = useState<{ x: number; y: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
+  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // Synchronize asteroids state with ref
-  const updateAsteroids = (newAsteroids: Asteroid[]) => {
+  const updateAsteroids = useCallback((newAsteroids: Asteroid[]) => {
     asteroidsRef.current = newAsteroids;
     setAsteroids(newAsteroids);
-  };
+  }, []);
 
   // Spawn asteroids
   const spawnAsteroid = useCallback(() => {
@@ -99,6 +103,24 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
 
     const currentList = asteroidsRef.current;
     updateAsteroids([...currentList.slice(-12), newAst]);
+  }, [updateAsteroids]);
+
+  const schedule = useCallback((callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      timersRef.current.delete(timer);
+      callback();
+    }, delay);
+    timersRef.current.add(timer);
+  }, []);
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      for (const timer of timers) {
+        clearTimeout(timer);
+      }
+      timers.clear();
+    };
   }, []);
 
   // Game loop for moving asteroids smoothly
@@ -139,7 +161,7 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
       clearInterval(spawnTimer);
       cancelAnimationFrame(animFrame);
     };
-  }, [spawnAsteroid]);
+  }, [spawnAsteroid, updateAsteroids]);
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!viewportRef.current) return;
@@ -163,8 +185,18 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
 
     // Laser visual beam
     const laserId = nextId.current++;
-    setLasers((prev) => [...prev, { id: laserId, targetX: clickX, targetY: clickY }]);
-    setTimeout(() => {
+    setLasers((prev) => [
+      ...prev,
+      {
+        id: laserId,
+        targetX: clickX,
+        targetY: clickY,
+        originLeftX: rect.width * 0.12,
+        originRightX: rect.width * 0.88,
+        originY: rect.height - 10,
+      },
+    ]);
+    schedule(() => {
       setLasers((prev) => prev.filter((l) => l.id !== laserId));
     }, 120);
 
@@ -194,7 +226,7 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
       // Trigger explosion
       const expId = nextId.current++;
       setExplosions((exps) => [...exps, { id: expId, x: hitAst.x, y: hitAst.y, size: hitAst.size }]);
-      setTimeout(() => {
+      schedule(() => {
         setExplosions((exps) => exps.filter((exp) => exp.id !== expId));
       }, 350);
 
@@ -203,7 +235,7 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
         const next = prev + 1;
         if (next >= REQUIRED_ASTEROIDS && !hasCompletedRef.current) {
           hasCompletedRef.current = true;
-          setTimeout(() => {
+          schedule(() => {
             sound.playTaskComplete();
             onCompleteRef.current();
           }, 400);
@@ -213,15 +245,12 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
     }
   };
 
-  const viewportWidth = viewportRef.current?.clientWidth || 480;
-  const viewportHeight = viewportRef.current?.clientHeight || 320;
-
   return (
     <div className="w-full max-w-xl bg-slate-900 border-4 border-slate-700 rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden select-none font-sans">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
         <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-red-400 animate-pulse" />
+          <Target className="w-5 h-5 text-red-400 animate-pulse motion-reduce:animate-none" />
           <h3 className="font-black uppercase text-sm tracking-wider text-slate-200 font-mono">
             WAFFEN: ASTEROIDEN ABSCHIEßEN
           </h3>
@@ -263,10 +292,10 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
                 top: `${crosshairPos.y}px`,
                 transform: 'translate(-50%, -50%)',
               }}
-              className="absolute pointer-events-none z-30 transition-transform duration-75"
+              className="absolute pointer-events-none z-30 transition-transform duration-75 motion-reduce:transition-none"
             >
               <div className="relative w-12 h-12 flex items-center justify-center">
-                <div className="w-10 h-10 border-2 border-emerald-400/80 rounded-full animate-spin" />
+                <div className="w-10 h-10 border-2 border-emerald-400/80 rounded-full animate-spin motion-reduce:animate-none" />
                 <div className="absolute w-2 h-2 bg-emerald-400 rounded-full" />
               </div>
             </div>
@@ -302,25 +331,25 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
             >
               {/* Left cannon laser */}
               <line
-                x1={viewportWidth * 0.12}
-                y1={viewportHeight - 10}
+                x1={laser.originLeftX}
+                y1={laser.originY}
                 x2={laser.targetX}
                 y2={laser.targetY}
                 stroke="#22c55e"
                 strokeWidth="5"
                 strokeLinecap="round"
-                className="animate-pulse"
+                className="animate-pulse motion-reduce:animate-none"
               />
               {/* Right cannon laser */}
               <line
-                x1={viewportWidth * 0.88}
-                y1={viewportHeight - 10}
+                x1={laser.originRightX}
+                y1={laser.originY}
                 x2={laser.targetX}
                 y2={laser.targetY}
                 stroke="#22c55e"
                 strokeWidth="5"
                 strokeLinecap="round"
-                className="animate-pulse"
+                className="animate-pulse motion-reduce:animate-none"
               />
             </svg>
           ))}
@@ -336,7 +365,7 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
               }}
               className="absolute pointer-events-none z-30 flex items-center justify-center"
             >
-              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-orange-400 via-amber-300 to-red-500 animate-ping opacity-90" />
+              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-orange-400 via-amber-300 to-red-500 animate-ping motion-reduce:animate-none opacity-90" />
             </div>
           ))}
 
@@ -348,7 +377,7 @@ export function ClearAsteroidsTask({ onComplete, onClose }: ClearAsteroidsTaskPr
         {/* Status Bar */}
         <div className="text-xs font-mono text-center text-slate-400">
           {destroyedCount >= REQUIRED_ASTEROIDS ? (
-            <span className="text-emerald-400 font-bold flex items-center justify-center gap-1.5 animate-bounce">
+            <span className="text-emerald-400 font-bold flex items-center justify-center gap-1.5 animate-bounce motion-reduce:animate-none">
               <Check className="w-4 h-4" /> AUFGABE ERFOLGREICH ABGESCHLOSSEN!
             </span>
           ) : (

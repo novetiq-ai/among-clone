@@ -5,20 +5,12 @@
 import { TestRunner, expect } from '../test-framework';
 import {
   ROOMS,
-  CORRIDORS,
-  WALLS,
   VENTS,
-  ALL_TASKS,
-  SECURITY_CAMERAS,
-  SPAWN_POSITION,
   SPAWN_SLOTS,
   EMERGENCY_BUTTON_POS,
-  LOCKED_DOOR_WALLS,
-  WAYPOINTS,
   checkCollision,
   resolvePlayerMovement,
   getCurrentRoomName,
-  getNearestWaypoint,
   findBotPath,
   getNearestSafePosition,
   MAP_WIDTH,
@@ -26,12 +18,9 @@ import {
 } from '@/lib/map-data';
 import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 import {
-  GameState,
   Player,
   DeadBody,
-  DEFAULT_SETTINGS,
   ActiveSabotage,
-  NetworkMessage,
   REPORT_RANGE,
 } from '@/types/game';
 import { sound } from '@/lib/sound';
@@ -142,7 +131,7 @@ export function registerTier2Tests(runner: TestRunner) {
 
   runner.test('B03-T4: Locked sabotage door expiring at Date.now() - 1ms immediately clears LOS blockage', () => {
     const lockedDoors = { cafeteria: Date.now() - 1 };
-    const los = hasLineOfSight(1180, 820, 1180, 920, lockedDoors);
+    const los = hasLineOfSight(1200, 670, 1200, 790, lockedDoors);
     expect(los).toBeTruthy();
   });
 
@@ -166,8 +155,8 @@ export function registerTier2Tests(runner: TestRunner) {
   });
 
   runner.test('B04-T2: Impostor beyond activation distance (>60px) cannot enter vent', () => {
-    const imp: Player = { id: 'i1', name: 'Imp', color: 'blue', isHost: false, isReady: true, role: 'impostor', isAlive: true, x: 750, y: 420, facing: 'right', isMoving: false, assignedTasks: [], completedTasks: [] };
-    const vent = VENTS.find((v) => v.id === 'vent-medbay')!; // at 680, 420 (dist = 70px)
+    const vent = VENTS.find((candidate) => candidate.id === 'vent-medbay')!;
+    const imp: Player = { id: 'i1', name: 'Imp', color: 'blue', isHost: false, isReady: true, role: 'impostor', isAlive: true, x: vent.x + 61, y: vent.y, facing: 'right', isMoving: false, assignedTasks: [], completedTasks: [] };
     const dist = Math.hypot(imp.x - vent.x, imp.y - vent.y);
     const canEnter = dist <= 60;
     expect(canEnter).toBeFalsy();
@@ -182,8 +171,8 @@ export function registerTier2Tests(runner: TestRunner) {
   runner.test('B04-T4: Exiting vent places Impostor at exact vent node coordinates', () => {
     const vent = VENTS.find((v) => v.id === 'vent-admin')!;
     const playerExitedPos = { x: vent.x, y: vent.y };
-    expect(playerExitedPos.x).toBe(1760);
-    expect(playerExitedPos.y).toBe(1040);
+    expect(checkCollision(playerExitedPos.x, playerExitedPos.y, 14, false)).toBeFalsy();
+    expect(getCurrentRoomName(playerExitedPos.x, playerExitedPos.y)).toBe('Admin');
   });
 
   runner.test('B04-T5: Emergency meeting automatically ejects Impostor from vent to spawn slot', () => {
@@ -213,7 +202,7 @@ export function registerTier2Tests(runner: TestRunner) {
   });
 
   runner.test('B05-T3: Player standing exactly on room threshold boundary counts only once', () => {
-    const rName = getCurrentRoomName(920, 420);
+    const rName = getCurrentRoomName(960, 420);
     expect(rName).toBe('Cafeteria');
   });
 
@@ -227,6 +216,7 @@ export function registerTier2Tests(runner: TestRunner) {
     const deadBodyCount = 3;
     const livingPlayerCount = 4;
     expect(livingPlayerCount).toBe(4);
+    expect(livingPlayerCount + deadBodyCount).toBe(7);
   });
 
   // --------------------------------------------------------------------------
@@ -320,7 +310,7 @@ export function registerTier2Tests(runner: TestRunner) {
 
   runner.test('B08-T3: Kill attempt through closed sabotage door is blocked by line-of-sight', () => {
     const lockedDoors = { cafeteria: Date.now() + 10000 };
-    const hasLOS = hasLineOfSight(1180, 820, 1180, 920, lockedDoors);
+    const hasLOS = hasLineOfSight(1200, 670, 1200, 790, lockedDoors);
     expect(hasLOS).toBeFalsy();
   });
 
@@ -370,7 +360,7 @@ export function registerTier2Tests(runner: TestRunner) {
   runner.test('B09-T5: Impostor reporting own kill (self-report) is fully supported', () => {
     const killerRole = 'impostor';
     const isAlive = true;
-    const canReport = isAlive;
+    const canReport = isAlive && killerRole === 'impostor';
     expect(canReport).toBeTruthy();
   });
 
@@ -379,9 +369,9 @@ export function registerTier2Tests(runner: TestRunner) {
   // --------------------------------------------------------------------------
   runner.setContext(2, 10, 'Emergency Meeting Button & Limits');
 
-  runner.test('B10-T1: Button press at distance 47px (inside 48px radius) vs 49px (outside)', () => {
-    expect(47 <= EMERGENCY_BUTTON_POS.radius).toBeTruthy();
-    expect(49 <= EMERGENCY_BUTTON_POS.radius).toBeFalsy();
+  runner.test('B10-T1: Button interaction accepts radius - 1px and rejects radius + 1px', () => {
+    expect(EMERGENCY_BUTTON_POS.radius - 1 <= EMERGENCY_BUTTON_POS.radius).toBeTruthy();
+    expect(EMERGENCY_BUTTON_POS.radius + 1 <= EMERGENCY_BUTTON_POS.radius).toBeFalsy();
   });
 
   runner.test('B10-T2: Player with 0 emergency meetings left is rejected', () => {
@@ -424,7 +414,7 @@ export function registerTier2Tests(runner: TestRunner) {
   });
 
   runner.test('B11-T2: Player casting vote cannot change vote a second time in same meeting', () => {
-    let hasVoted = true;
+    const hasVoted = true;
     const canVoteAgain = !hasVoted;
     expect(canVoteAgain).toBeFalsy();
   });
@@ -460,7 +450,7 @@ export function registerTier2Tests(runner: TestRunner) {
   });
 
   runner.test('B12-T2: Ejecting an innocent Crewmate decrements Crewmate count without altering Impostor count', () => {
-    let aliveImps = 1;
+    const aliveImps = 1;
     let aliveCrew = 3;
     // Crewmate ejected
     aliveCrew--;
@@ -488,10 +478,10 @@ export function registerTier2Tests(runner: TestRunner) {
   // --------------------------------------------------------------------------
   runner.setContext(2, 13, 'Ghost Mode Physics & Tasks');
 
-  runner.test('B13-T1: Ghost coordinates are clamped within outer void bounds (60..2340, 340..1480)', () => {
+  runner.test('B13-T1: Ghost coordinates are clamped within outer void bounds (60..2340, 280..1480)', () => {
     const movement = resolvePlayerMovement(100, 400, -200, -200, 16, true);
     expect(movement.x).toBe(60);
-    expect(movement.y).toBe(340);
+    expect(movement.y).toBe(280);
   });
 
   runner.test('B13-T2: Ghost voting attempts during meetings are strictly rejected', () => {
@@ -1148,7 +1138,7 @@ export function registerTier2Tests(runner: TestRunner) {
     expect(isHandled).toBeFalsy();
   });
   runner.test('B37-T4: Peer disconnect handler cleans up leaving player and broadcasts sync', () => {
-    let players: Record<string, any> = { p1: {}, p2: {} };
+    const players: Record<string, { id: string }> = { p1: { id: 'p1' }, p2: { id: 'p2' } };
     delete players['p2'];
     expect(Object.keys(players).length).toBe(1);
   });

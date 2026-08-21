@@ -4,30 +4,21 @@
 
 import { TestRunner, expect } from '../test-framework';
 import {
-  ROOMS,
-  CORRIDORS,
-  WALLS,
   VENTS,
-  ALL_TASKS,
   SECURITY_CAMERAS,
   SPAWN_SLOTS,
-  EMERGENCY_BUTTON_POS,
   resolvePlayerMovement,
   getCurrentRoomName,
-  findBotPath,
 } from '@/lib/map-data';
 import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 import {
   GameState,
-  Player,
   DeadBody,
   DEFAULT_SETTINGS,
-  ActiveSabotage,
   NetworkMessage,
   ChatMessage,
   EjectionData,
 } from '@/types/game';
-import { sound } from '@/lib/sound';
 
 export function registerTier4Tests(runner: TestRunner) {
   runner.setContext(4, 1, 'Real-World Match Scenarios');
@@ -37,7 +28,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // ==========================================================================
   runner.test('SCENARIO 1: Full Singleplayer Crewmate Match (Lobby -> Role -> Tasks -> Body -> Vote -> Win)', async () => {
     // 1. Lobby Initialization
-    let state: GameState = {
+    const state: GameState = {
       phase: 'lobby',
       roomCode: 'SKLD',
       players: {
@@ -125,6 +116,8 @@ export function registerTier4Tests(runner: TestRunner) {
 
     // 7. Ejection Cutscene
     state.phase = 'ejection';
+    expect(votes[ejectedId]).toBeGreaterThan(votes.human);
+
     state.players.bot1.isAlive = false;
     const ejectionData: EjectionData = {
       ejectedPlayerId: 'bot1',
@@ -156,7 +149,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // ==========================================================================
   runner.test('SCENARIO 2: Full Singleplayer Impostor Match (Role -> Stalk -> Kill -> Vent -> Sabotage -> Timeout Win)', async () => {
     // 1. Lobby & Impostor Role Assignment
-    let state: GameState = {
+    const state: GameState = {
       phase: 'playing',
       roomCode: 'IMPO',
       players: {
@@ -221,7 +214,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // SCENARIO 3: Ghost Mode Task Completion Win
   // ==========================================================================
   runner.test('SCENARIO 3: Ghost Mode Task Completion Win (Killed early -> Float walls -> Finish tasks -> Win)', async () => {
-    let state: GameState = {
+    const state: GameState = {
       phase: 'playing',
       roomCode: 'GHST',
       players: {
@@ -267,7 +260,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // SCENARIO 4: Emergency Meeting & Critical Sabotage Interaction
   // ==========================================================================
   runner.test('SCENARIO 4: Emergency Meeting & Critical Sabotage Interaction (Blocked -> Fixed -> Unblocked -> Vote)', async () => {
-    let state: GameState = {
+    const state: GameState = {
       phase: 'playing',
       roomCode: 'EMRG',
       players: {
@@ -347,7 +340,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // SCENARIO 6: CCTV Surveillance & Witness Catch
   // ==========================================================================
   runner.test('SCENARIO 6: CCTV Surveillance & Witness Catch (Camera active -> Kill observed -> Guard reports -> Vote)', async () => {
-    let state: GameState = {
+    const state: GameState = {
       phase: 'playing',
       roomCode: 'CCTV',
       players: {
@@ -398,7 +391,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // SCENARIO 7: Impostor Parity Elimination Match
   // ==========================================================================
   runner.test('SCENARIO 7: Impostor Parity Elimination Match (5 players -> 2 kills -> 1v1 Parity -> Impostor Victory)', async () => {
-    let state: GameState = {
+    const state: GameState = {
       phase: 'playing',
       roomCode: 'PART',
       players: {
@@ -432,7 +425,7 @@ export function registerTier4Tests(runner: TestRunner) {
   // SCENARIO 8: Oxygen Depletion Sabotage Crisis & Dual Keypad Resolution
   // ==========================================================================
   runner.test('SCENARIO 8: Oxygen Depletion Sabotage Crisis (Sabotage triggered -> Admin & O2 keypads solved -> Crisis resolved)', async () => {
-    let state: GameState = {
+    const state: GameState = {
       phase: 'playing',
       roomCode: 'OXYG',
       players: {

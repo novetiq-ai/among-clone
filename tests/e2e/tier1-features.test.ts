@@ -6,7 +6,6 @@ import { TestRunner, expect } from '../test-framework';
 import {
   ROOMS,
   CORRIDORS,
-  WALLS,
   VENTS,
   ALL_TASKS,
   SECURITY_CAMERAS,
@@ -26,7 +25,6 @@ import {
 } from '@/lib/map-data';
 import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 import {
-  GameState,
   Player,
   DeadBody,
   DEFAULT_SETTINGS,
@@ -77,14 +75,20 @@ export function registerTier1Tests(runner: TestRunner) {
     }
   });
 
-  runner.test('F01-T3: Hallway corridors link adjacent rooms across the ship', () => {
-    expect(CORRIDORS.length).toBeGreaterThanOrEqual(14);
-    const corridorIds = CORRIDORS.map((c) => c.id);
-    expect(corridorIds).toContain('corr-caf-med');
-    expect(corridorIds).toContain('corr-caf-weap');
-    expect(corridorIds).toContain('corr-center-main');
-    expect(corridorIds).toContain('corr-react-sec');
-    expect(corridorIds).toContain('corr-weap-nav');
+  runner.test('F01-T3: Hallway corridors link every major ship branch', () => {
+    expect(CORRIDORS.length).toBeGreaterThanOrEqual(13);
+    const corridorIds = CORRIDORS.map((corridor) => corridor.id);
+    for (const requiredId of [
+      'corr-upper-hall',
+      'corr-west-cross-horiz',
+      'corr-lower-hall',
+      'corr-center-main',
+      'corr-caf-weap',
+      'corr-east-nav-top',
+      'corr-stor-shields',
+    ]) {
+      expect(corridorIds).toContain(requiredId);
+    }
   });
 
   runner.test('F01-T4: getCurrentRoomName correctly identifies room coordinates', () => {
@@ -116,31 +120,31 @@ export function registerTier1Tests(runner: TestRunner) {
   });
 
   runner.test('F02-T2: Check collision returns false in clear Cafeteria floor', () => {
-    const collides = checkCollision(1200, 520, 16, false);
+    const collides = checkCollision(1050, 500, 16, false);
     expect(collides).toBeFalsy();
   });
 
   runner.test('F02-T3: Check collision detects interior obstacle (Cafeteria Meeting Table)', () => {
-    // Meeting table obstacle at x:1110, y:590, w:180, h:100
-    const collides = checkCollision(1200, 640, 16, false);
+    // Central table obstacle at x:1120, y:460, w:160, h:80
+    const collides = checkCollision(1200, 500, 16, false);
     expect(collides).toBeTruthy();
   });
 
   runner.test('F02-T4: Ghost mode completely bypasses structural wall collision', () => {
     const ghostCollides = checkCollision(1200, 100, 16, true);
     expect(ghostCollides).toBeFalsy();
-    const ghostTableCollides = checkCollision(1200, 640, 16, true);
+    const ghostTableCollides = checkCollision(1200, 500, 16, true);
     expect(ghostTableCollides).toBeFalsy();
   });
 
-  runner.test('F02-T5: Continuous movement resolver slides along obstacles and walls', () => {
-    const startX = 1200;
-    const startY = 520;
-    // Attempt moving into meeting table (dy = 120)
-    const result = resolvePlayerMovement(startX, startY, 0, 120, 16, false);
+  runner.test('F02-T5: Continuous movement resolver stops at obstacles without tunneling', () => {
+    const startX = 1080;
+    const startY = 500;
+    const result = resolvePlayerMovement(startX, startY, 100, 0, 16, false);
     expect(result.moved).toBeTruthy();
-    expect(result.y).toBeLessThan(590); // Blocked before entering table hitbox
-    expect(result.x).toBe(startX);
+    expect(result.x).toBeLessThan(1120 - 15);
+    expect(result.y).toBe(startY);
+    expect(checkCollision(result.x, result.y, 16, false)).toBeFalsy();
   });
 
   // --------------------------------------------------------------------------
@@ -170,12 +174,12 @@ export function registerTier1Tests(runner: TestRunner) {
     const futureExpiry = Date.now() + 10000;
     const lockedDoors = { cafeteria: futureExpiry };
     // Across Cafeteria south doorway (1180, 840) to central corridor (1180, 920)
-    const losBlocked = hasLineOfSight(1180, 820, 1180, 920, lockedDoors);
+    const losBlocked = hasLineOfSight(1200, 670, 1200, 790, lockedDoors);
     expect(losBlocked).toBeFalsy();
 
     // Expired lock allows line of sight
     const expiredLock = { cafeteria: Date.now() - 1000 };
-    const losOpen = hasLineOfSight(1180, 820, 1180, 920, expiredLock);
+    const losOpen = hasLineOfSight(1200, 670, 1200, 790, expiredLock);
     expect(losOpen).toBeTruthy();
   });
 
@@ -200,7 +204,7 @@ export function registerTier1Tests(runner: TestRunner) {
   // --------------------------------------------------------------------------
   runner.setContext(1, 4, '4 Vent Networks');
 
-  runner.test('F04-T1: Total 14 canonical vent nodes configured on The Skeld', () => {
+  runner.test('F04-T1: Total 14 canonical vent nodes configured on the vessel', () => {
     expect(VENTS.length).toBe(14);
     const ventIds = VENTS.map((v) => v.id);
     expect(ventIds).toContain('vent-medbay');
@@ -228,7 +232,7 @@ export function registerTier1Tests(runner: TestRunner) {
   runner.test('F04-T3: Triangle 2 (Cafeteria <-> Admin <-> Hallway) is fully connected', () => {
     const cafVent = VENTS.find((v) => v.id === 'vent-cafeteria')!;
     expect(cafVent.connectedVents).toContain('vent-admin');
-    expect(cafVent.connectedVents).toContain('vent-hallway-admin');
+    expect(cafVent.connectedVents).toContain('vent-hallway-shields');
   });
 
   runner.test('F04-T4: Engine / Reactor pairs connect only their designated paired nodes', () => {
@@ -418,7 +422,7 @@ export function registerTier1Tests(runner: TestRunner) {
     const playerIds = ['human', 'bot1', 'bot2', 'bot3'];
     const impostorCount = 1;
     const impostorIds = [playerIds[Math.floor(Math.random() * playerIds.length)]];
-    expect(impostorIds.length).toBe(1);
+    expect(impostorIds.length).toBe(impostorCount);
     expect(playerIds).toContain(impostorIds[0]);
   });
 
@@ -553,13 +557,22 @@ export function registerTier1Tests(runner: TestRunner) {
 
   runner.test('F10-T1: Emergency button is located at Cafeteria center meeting table', () => {
     expect(EMERGENCY_BUTTON_POS.x).toBe(1200);
-    expect(EMERGENCY_BUTTON_POS.y).toBe(640);
-    expect(EMERGENCY_BUTTON_POS.radius).toBe(48);
+    expect(EMERGENCY_BUTTON_POS.y).toBe(500);
+    expect(EMERGENCY_BUTTON_POS.radius).toBe(72);
   });
 
   runner.test('F10-T2: Player within activation radius can call emergency meeting', () => {
-    const playerPos = { x: 1200, y: 620 };
-    const dist = Math.hypot(playerPos.x - EMERGENCY_BUTTON_POS.x, playerPos.y - EMERGENCY_BUTTON_POS.y);
+    const playerPos = getNearestSafePosition(
+      EMERGENCY_BUTTON_POS.x,
+      EMERGENCY_BUTTON_POS.y,
+      undefined,
+      16
+    );
+    const dist = Math.hypot(
+      playerPos.x - EMERGENCY_BUTTON_POS.x,
+      playerPos.y - EMERGENCY_BUTTON_POS.y
+    );
+    expect(checkCollision(playerPos.x, playerPos.y, 16, false)).toBeFalsy();
     expect(dist).toBeLessThanOrEqual(EMERGENCY_BUTTON_POS.radius);
   });
 
@@ -621,7 +634,7 @@ export function registerTier1Tests(runner: TestRunner) {
     const counts: Record<string, number> = {};
     for (const v of Object.values(votes)) counts[v] = (counts[v] || 0) + 1;
 
-    let highestTarget = 'skip';
+    const highestTarget = 'skip';
     expect(counts['skip']).toBe(2);
     expect(highestTarget).toBe('skip');
   });
@@ -663,7 +676,7 @@ export function registerTier1Tests(runner: TestRunner) {
   runner.test('F12-T2: Confirm ejects setting reveals whether ejected player was Impostor', () => {
     const confirmEjects = true;
     const role = 'impostor';
-    const text = confirmEjects ? `SusPlayer was An Impostor.` : `SusPlayer was ejected.`;
+    const text = confirmEjects && role === 'impostor' ? `SusPlayer was An Impostor.` : `SusPlayer was ejected.`;
     expect(text).toContain('An Impostor');
   });
 
@@ -1308,19 +1321,19 @@ export function registerTier1Tests(runner: TestRunner) {
   runner.test('F35-T2: Door lockdown collider walls block player movement into or out of room', () => {
     const now = Date.now();
     const lockedDoors = { cafeteria: now + 10000 };
-    const collidesAtDoorway = checkCollision(900, 500, 16, false, lockedDoors);
+    const collidesAtDoorway = checkCollision(1200, 730, 16, false, lockedDoors);
     expect(collidesAtDoorway).toBeTruthy();
   });
   runner.test('F35-T3: Ghost mode players float through locked sabotage doors freely', () => {
     const now = Date.now();
     const lockedDoors = { cafeteria: now + 10000 };
-    const ghostCollides = checkCollision(900, 500, 16, true, lockedDoors);
+    const ghostCollides = checkCollision(1200, 730, 16, true, lockedDoors);
     expect(ghostCollides).toBeFalsy();
   });
   runner.test('F35-T4: Door lockdown automatically expires after 10 seconds duration', () => {
     const lockExpiry = Date.now() - 500; // In the past
     const lockedDoors = { cafeteria: lockExpiry };
-    const collidesAfterExpiry = checkCollision(900, 500, 16, false, lockedDoors);
+    const collidesAfterExpiry = checkCollision(1200, 730, 16, false, lockedDoors);
     expect(collidesAfterExpiry).toBeFalsy();
   });
   runner.test('F35-T5: Locking doors triggers door lock sound effect', () => {
@@ -1356,10 +1369,10 @@ export function registerTier1Tests(runner: TestRunner) {
   });
 
   runner.setContext(1, 37, 'WebRTC P2P Multiplayer Mesh');
-  runner.test('F37-T1: 4-character room codes generated without ambiguous characters', () => {
+  runner.test('F37-T1: 6-character room codes use the unambiguous secure alphabet', () => {
     const code = generateRoomCode();
-    expect(code.length).toBe(4);
-    expect(code).toMatch(/^[A-Z2-9]{4}$/);
+    expect(code.length).toBe(6);
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
     expect(code).not.toContain('0');
     expect(code).not.toContain('O');
     expect(code).not.toContain('1');
@@ -1419,7 +1432,7 @@ export function registerTier1Tests(runner: TestRunner) {
     expect(moveMsg.x).toBe(1250);
   });
   runner.test('F37-T5: Disconnecting peer is safely purged from gameState.players', () => {
-    let players: Record<string, Player> = {
+    const players: Record<string, Player> = {
       p1: { id: 'p1', name: 'Stay', color: 'red', isHost: true, isReady: true, role: 'crewmate', isAlive: true, x: 0, y: 0, facing: 'right', isMoving: false, assignedTasks: [], completedTasks: [] },
       p2: { id: 'p2', name: 'Leave', color: 'blue', isHost: false, isReady: true, role: 'crewmate', isAlive: true, x: 0, y: 0, facing: 'right', isMoving: false, assignedTasks: [], completedTasks: [] },
     };
@@ -1559,9 +1572,8 @@ export function registerTier1Tests(runner: TestRunner) {
   runner.test('F40-T5: Safe spawn slots distribute players evenly around Cafeteria meeting table', () => {
     expect(SPAWN_SLOTS.length).toBeGreaterThanOrEqual(10);
     for (const slot of SPAWN_SLOTS) {
-      // Must not overlap meeting table collision box (x: 1110..1290, y: 590..690)
-      const inTable = slot.x >= 1110 && slot.x <= 1290 && slot.y >= 590 && slot.y <= 690;
-      expect(inTable).toBeFalsy();
+      expect(checkCollision(slot.x, slot.y, 16, false)).toBeFalsy();
     }
+    expect(checkCollision(SPAWN_POSITION.x, SPAWN_POSITION.y, 16, false)).toBeFalsy();
   });
 }

@@ -10,7 +10,7 @@ import {
   EMERGENCY_BUTTON_POS,
   getCurrentRoomName,
 } from '@/lib/map-data';
-import { Map as MapIcon, X, Navigation2, Megaphone, Skull, Compass, Zap, Flame, AlertTriangle } from 'lucide-react';
+import { Map as MapIcon, X, Compass } from 'lucide-react';
 
 interface SkeldMinimapModalProps {
   localPlayer: Player;
@@ -52,7 +52,7 @@ export function SkeldMinimapModal({ localPlayer, activeSabotage, onClose }: Skel
             </div>
             <div>
               <h3 className="font-mono font-black text-white text-sm sm:text-base tracking-wider flex items-center gap-2">
-                THE SKELD <span className="text-cyan-400">•</span> SCHIFFS-RADARPLAN
+                NEBULA VESSEL <span className="text-cyan-400">•</span> SCHIFFS-RADARPLAN
               </h3>
               <p className="text-slate-400 font-mono text-[11px] flex items-center gap-1.5 mt-0.5">
                 <Compass className="w-3.5 h-3.5 text-cyan-400" />
@@ -71,7 +71,7 @@ export function SkeldMinimapModal({ localPlayer, activeSabotage, onClose }: Skel
           </button>
         </div>
 
-        {/* Authentic Among Us Hologram SVG Map */}
+        {/* Procedural Nebula hologram map */}
         <div className="relative w-full h-[52vh] sm:h-[60vh] bg-slate-950 border-2 border-cyan-900/70 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center">
           {/* Subtle Radar Scanline Grid Background */}
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#082f4915_1px,transparent_1px),linear-gradient(to_bottom,#082f4915_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PlayerColor, PLAYER_COLORS, HatType, KillAnimationType } from '@/types/game';
+import { PlayerColor, HatType, KillAnimationType } from '@/types/game';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
 import { playKillSound } from '@/lib/sound';
 
@@ -91,7 +91,7 @@ export function KillAnimationOverlay({
         <span className="font-mono text-red-500 font-black tracking-widest text-sm uppercase animate-pulse">
           {isVictimLocal ? '⚠️ DU WURDEST ELIMINIERT!' : '🔪 ELIMINIERUNG AUSGEFÜHRT'}
         </span>
-        <span className="font-mono text-slate-500 text-xs">THE SKELD SECURITY FEED</span>
+        <span className="font-mono text-slate-500 text-xs">NEBULA VESSEL SECURITY FEED</span>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-16 bg-black border-t border-red-900/50 shadow-2xl z-20" />
 

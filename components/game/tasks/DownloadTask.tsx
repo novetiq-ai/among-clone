@@ -76,7 +76,7 @@ export function DownloadTask({ onComplete, onClose }: DownloadTaskProps) {
             <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-cyan-400 border border-cyan-500/30">
               <HardDrive className="w-6 h-6" />
             </div>
-            <span className="text-[10px] font-mono text-slate-400">SKELD_CORE</span>
+            <span className="text-[10px] font-mono text-slate-400">NEBULA_CORE</span>
           </div>
 
           {/* Animated packets */}
