@@ -4,15 +4,11 @@
 
 import { TestRunner, expect } from '../test-framework';
 import {
-  ROOMS,
-  CORRIDORS,
-  WALLS,
   VENTS,
   ALL_TASKS,
   SECURITY_CAMERAS,
   SPAWN_SLOTS,
   EMERGENCY_BUTTON_POS,
-  LOCKED_DOOR_WALLS,
   checkCollision,
   resolvePlayerMovement,
   getCurrentRoomName,
@@ -20,14 +16,12 @@ import {
 } from '@/lib/map-data';
 import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 import {
-  GameState,
   Player,
   DeadBody,
   DEFAULT_SETTINGS,
   ActiveSabotage,
   NetworkMessage,
 } from '@/types/game';
-import { sound } from '@/lib/sound';
 
 export function registerTier3Tests(runner: TestRunner) {
   runner.setContext(3, 1, 'Cross-Feature Interactions');
@@ -107,8 +101,8 @@ export function registerTier3Tests(runner: TestRunner) {
     killer.inVent = false;
     killer.ventId = undefined;
 
-    expect(killer.x).toBe(670);
-    expect(killer.y).toBe(970);
+    expect(killer.x).toBe(elecVent.x);
+    expect(killer.y).toBe(elecVent.y);
     expect(getCurrentRoomName(killer.x, killer.y)).toBe('Electrical');
   });
 
@@ -116,7 +110,7 @@ export function registerTier3Tests(runner: TestRunner) {
     const now = Date.now();
     const lockedDoors = { electrical: now + 10000 };
     // Door at doorway x: 680..840, y: 880
-    const collidesAtDoor = checkCollision(750, 880, 16, false, lockedDoors);
+    const collidesAtDoor = checkCollision(760, 1150, 16, false, lockedDoors);
     expect(collidesAtDoor).toBeTruthy();
   });
 
@@ -185,7 +179,7 @@ export function registerTier3Tests(runner: TestRunner) {
   runner.test('X17: Confirm Ejects (true) reveals Impostor identity upon ejection', () => {
     const confirmEjects = true;
     const role = 'impostor';
-    const msg = confirmEjects ? `Red was An Impostor.` : `Red was ejected.`;
+    const msg = confirmEjects && role === 'impostor' ? `Red was An Impostor.` : `Red was ejected.`;
     expect(msg).toBe('Red was An Impostor.');
   });
 
@@ -197,7 +191,7 @@ export function registerTier3Tests(runner: TestRunner) {
 
   runner.test('X19: Tie vote results in no ejection and resumes gameplay phase', () => {
     const votes = { p1: 2, p2: 2 };
-    const isTie = true;
+    const isTie = votes.p1 === votes.p2;
     const nextPhase = 'playing';
     expect(isTie).toBeTruthy();
     expect(nextPhase).toBe('playing');
@@ -265,9 +259,12 @@ export function registerTier3Tests(runner: TestRunner) {
     expect(los).toBeFalsy();
   });
 
-  runner.test('X29: AI Bot pathfinding navigates around obstacles using Dijkstra waypoint graph', () => {
-    const path = findBotPath(1200, 510, 1560, 1020); // Cafeteria to Admin
+  runner.test('X29: AI Bot A* pathfinding navigates around colliders to the exact task', () => {
+    const adminTask = ALL_TASKS.find((task) => task.id === 'task-admin-card')!;
+    const path = findBotPath(1200, 410, adminTask.x, adminTask.y);
     expect(path.length).toBeGreaterThan(1);
+    expect(path[path.length - 1].x).toBe(adminTask.x);
+    expect(path[path.length - 1].y).toBe(adminTask.y);
     expect(path[path.length - 1].room).toBe('Admin');
   });
 

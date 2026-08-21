@@ -1,4 +1,4 @@
-// Web Audio API Sound Generator for Among Us Experience
+// Procedural Web Audio sound generator for Nebula Deception
 // No external assets required, 100% reliable synthesized audio
 
 class SoundEngine {

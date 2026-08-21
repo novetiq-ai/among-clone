@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="space" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#111c36"/>
+      <stop offset="1" stop-color="#050816"/>
+    </linearGradient>
+    <linearGradient id="suit" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ff4b45"/>
+      <stop offset="1" stop-color="#b80832"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#e8fbff"/>
+      <stop offset="1" stop-color="#68c9ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#space)"/>
+  <path d="M7 39c9-20 37-30 51-12" fill="none" stroke="#7c3aed" stroke-width="2" opacity=".65"/>
+  <circle cx="10" cy="15" r="1.5" fill="#fbbf24"/>
+  <circle cx="53" cy="48" r="1.5" fill="#22d3ee"/>
+  <rect x="12" y="27" width="10" height="19" rx="5" fill="#7f123d"/>
+  <rect x="18" y="12" width="31" height="40" rx="14" fill="url(#suit)" stroke="#ff7a70" stroke-width="2"/>
+  <rect x="27" y="18" width="25" height="14" rx="7" fill="url(#glass)" stroke="#d9f7ff" stroke-width="2"/>
+  <path d="M21 45v9h10v-8m5 0v8h10v-11" fill="url(#suit)" stroke="#ff7a70" stroke-width="2" stroke-linejoin="round"/>
+</svg>

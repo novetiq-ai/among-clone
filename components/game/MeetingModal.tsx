@@ -8,7 +8,7 @@ import {
   PlayerColor,
 } from '@/types/game';
 import { AstronautAvatar } from '@/components/AstronautAvatar';
-import { Megaphone, Send, Clock, Check, X, ShieldAlert, SkipForward } from 'lucide-react';
+import { Megaphone, Send, Clock, Check, X, SkipForward } from 'lucide-react';
 
 interface MeetingModalProps {
   isEmergencyMeeting: boolean;
@@ -43,6 +43,9 @@ export function MeetingModal({
   const [chatInput, setChatInput] = useState('');
   const [activeTab, setActiveTab] = useState<'voting' | 'chat'>('voting');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const reporterColorHex = reporterColor
+    ? PLAYER_COLORS.find((color) => color.id === reporterColor)?.hex
+    : undefined;
 
   const playerList = Object.values(players);
 
@@ -92,7 +95,11 @@ export function MeetingModal({
               {isEmergencyMeeting ? 'NOTFALL-MEETING' : 'LEICHE GEMELDET!'}
             </h2>
             <p className="text-xs font-mono text-slate-300">
-              Einberufen von: <strong className="text-amber-400">{reporterName}</strong>
+              Einberufen von:{' '}
+              {reporterColorHex ? (
+                <span aria-hidden="true" className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: reporterColorHex }} />
+              ) : null}
+              <strong className="text-amber-400">{reporterName}</strong>
             </p>
           </div>
         </div>

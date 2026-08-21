@@ -2,23 +2,25 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'My Google AI Studio App',
-  description: 'An application built with Google AI Studio.',
+  applicationName: 'Nebula Deception',
+  title: 'Nebula Deception',
+  description: 'Ein browserbasiertes Social-Deduction-Spiel für private Runden.',
   openGraph: {
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'Nebula Deception',
+    description: 'Täuschung, Teamwork und Sabotage in einer privaten Browser-Runde.',
     type: 'website',
+    locale: 'de_DE',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'Nebula Deception',
+    description: 'Täuschung, Teamwork und Sabotage in einer privaten Browser-Runde.',
   },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en">
+    <html lang="de">
       <body suppressHydrationWarning>{children}</body>
     </html>
   );

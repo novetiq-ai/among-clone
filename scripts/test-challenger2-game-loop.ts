@@ -14,27 +14,15 @@ import {
   Player,
   DeadBody,
   DEFAULT_SETTINGS,
-  GameSettings,
-  ActiveSabotage,
   EjectionData,
-  SabotageType,
-  ChatMessage,
 } from '../types/game';
 import {
-  ROOMS,
-  CORRIDORS,
-  WALLS,
-  LOCKED_DOOR_WALLS,
   ALL_TASKS,
-  VENTS,
   WAYPOINTS,
   SPAWN_POSITION,
-  EMERGENCY_BUTTON_POS,
   checkCollision,
   resolvePlayerMovement,
   findBotPath,
-  getNearestWaypoint,
-  getCurrentRoomName,
 } from '../lib/map-data';
 import { hasLineOfSight } from '../components/game/TheSkeldMap';
 
@@ -469,7 +457,7 @@ function testMeetingAndVotingMechanics() {
     }
 
     const wasSkipped = highestTarget === 'skip';
-    assert(wasSkipped, 'Vote Tally: Skip majority recognized');
+    assert(wasSkipped && !isTie, 'Vote Tally: Skip majority recognized without a tie');
   }
 
   // 2.7 Anonymous Voting & Confirm Ejects Settings
@@ -607,7 +595,7 @@ function testSabotageMechanicsAndDoorLocks() {
     if (state.activeSabotage.countdown <= 0 && state.activeSabotage.type === 'reactor') {
       state.phase = 'game_over';
       state.winner = 'impostors';
-      state.winReason = 'Kritische Reaktorschmelze! Die Skeld wurde zerstört.';
+      state.winReason = 'Kritische Reaktorschmelze! Das Nebula-Schiff wurde zerstört.';
     }
     assert(state.phase === 'game_over' && state.winner === 'impostors', 'Critical Sabotage: Reactor Meltdown countdown expiry triggers instant Impostor victory');
   }
@@ -679,7 +667,7 @@ function testBotAIBehaviorAndNavMesh() {
     assert(WAYPOINTS.length === 23, `NavMesh: Total waypoints equals 23 (observed: ${WAYPOINTS.length})`);
 
     let allPairsConnected = true;
-    let failedPairs: string[] = [];
+    const failedPairs: string[] = [];
 
     for (let i = 0; i < WAYPOINTS.length; i++) {
       for (let j = 0; j < WAYPOINTS.length; j++) {

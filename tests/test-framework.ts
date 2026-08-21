@@ -68,7 +68,7 @@ export class TestRunner {
 
       try {
         await t.fn();
-      } catch (err: any) {
+      } catch (err: unknown) {
         passed = false;
         error = err instanceof Error ? err : new Error(String(err));
       }
@@ -111,8 +111,23 @@ export class TestRunner {
 }
 
 function createMatchers<T>(actual: T, isNot = false) {
+function describeThrown(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
+function getLength(value: unknown): number | undefined {
+  if (typeof value === 'string' || Array.isArray(value)) {
+    return value.length;
+  }
+  if (value !== null && typeof value === 'object' && 'length' in value) {
+    const length = (value as { length?: unknown }).length;
+    return typeof length === 'number' ? length : undefined;
+  }
+  return undefined;
+}
+
   return {
-    toBe(expected: any) {
+    toBe(expected: unknown) {
       const condition = actual === expected;
       if (isNot ? condition : !condition) {
         throw new Error(
@@ -122,7 +137,7 @@ function createMatchers<T>(actual: T, isNot = false) {
         );
       }
     },
-    toEqual(expected: any) {
+    toEqual(expected: unknown) {
       const a = JSON.stringify(actual);
       const e = JSON.stringify(expected);
       const condition = a === e;
@@ -204,7 +219,7 @@ function createMatchers<T>(actual: T, isNot = false) {
         );
       }
     },
-    toContain(item: any) {
+    toContain(item: unknown) {
       let condition = false;
       if (Array.isArray(actual)) {
         condition = actual.includes(item);
@@ -236,23 +251,24 @@ function createMatchers<T>(actual: T, isNot = false) {
         throw new Error(`toThrow called on non-function`);
       }
       let threw = false;
-      let thrownError: any;
+      let thrownError: unknown;
       try {
-        (actual as any)();
-      } catch (err: any) {
+        const callable = actual as () => unknown;
+        callable();
+      } catch (err: unknown) {
         threw = true;
         thrownError = err;
       }
       if (isNot) {
         if (threw) {
-          throw new Error(`Expected function NOT to throw, but it threw: ${thrownError?.message || thrownError}`);
+          throw new Error(`Expected function NOT to throw, but it threw: ${describeThrown(thrownError)}`);
         }
       } else {
         if (!threw) {
           throw new Error(`Expected function to throw an error, but it did not`);
         }
-        if (expectedSubstring && thrownError) {
-          const msg = String(thrownError.message || thrownError);
+        if (expectedSubstring && thrownError !== undefined) {
+          const msg = describeThrown(thrownError);
           if (!msg.includes(expectedSubstring)) {
             throw new Error(`Expected error message to contain "${expectedSubstring}", got "${msg}"`);
           }
@@ -284,12 +300,13 @@ function createMatchers<T>(actual: T, isNot = false) {
       }
     },
     toHaveLength(len: number) {
-      const condition = actual !== null && actual !== undefined && typeof (actual as any).length === 'number' && (actual as any).length === len;
+      const actualLength = getLength(actual);
+      const condition = actualLength === len;
       if (isNot ? condition : !condition) {
         throw new Error(
           isNot
             ? `Expected length NOT to be ${len}`
-            : `Expected length ${len}, received ${(actual as any)?.length}`
+            : `Expected length ${len}, received ${actualLength}`
         );
       }
     },

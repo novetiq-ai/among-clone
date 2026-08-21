@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Cpu, Check, AlertCircle } from 'lucide-react';
+import { Cpu } from 'lucide-react';
 import { sound } from '@/lib/sound';
 
 interface StartReactorTaskProps {
@@ -91,10 +91,11 @@ export function StartReactorTask({ onComplete, onClose }: StartReactorTaskProps)
         if (currentRound === TOTAL_ROUNDS) {
           if (!hasCompletedRef.current) {
             hasCompletedRef.current = true;
-            setTimeout(() => {
+            const completionTimer = setTimeout(() => {
               sound.playTaskComplete();
               onCompleteRef.current();
             }, 400);
+            timeoutsRef.current.push(completionTimer);
           }
         } else {
           // Next round
@@ -107,10 +108,11 @@ export function StartReactorTask({ onComplete, onClose }: StartReactorTaskProps)
       // Mistake! Flash red and repeat round
       sound.playToneBeep(180, 0.3);
       setErrorFlash(true);
-      setTimeout(() => {
+      const retryTimer = setTimeout(() => {
         setErrorFlash(false);
         playSequence(currentRound, sequence);
       }, 600);
+      timeoutsRef.current.push(retryTimer);
     }
   };
 
@@ -125,8 +127,10 @@ export function StartReactorTask({ onComplete, onClose }: StartReactorTaskProps)
           </h3>
         </div>
         <button
+          type="button"
           onClick={onClose}
-          className="text-slate-400 hover:text-white text-xs font-mono font-bold px-2 py-1 bg-slate-800 rounded-lg cursor-pointer"
+          aria-label="Reaktor-Aufgabe schließen"
+          className="min-h-11 text-slate-400 hover:text-white text-xs font-mono font-bold px-3 py-2 bg-slate-800 rounded-lg cursor-pointer"
         >
           SCHLIEßEN [ESC]
         </button>
@@ -199,6 +203,7 @@ export function StartReactorTask({ onComplete, onClose }: StartReactorTaskProps)
                   <button
                     key={idx}
                     type="button"
+                    aria-label={`Reaktor-Eingabefeld ${idx + 1}`}
                     onClick={() => handlePadClick(idx)}
                     disabled={isShowingSequence || errorFlash}
                     className={`rounded-xl border-2 font-mono font-bold transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md ${

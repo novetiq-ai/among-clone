@@ -269,7 +269,7 @@ export function AstronautAvatar({
               />
             </g>
           ) : (
-            // Full Authentic Among Us Crewmate
+            // Full procedural Nebula astronaut
             <g>
               {/* Oxygen Tank / Backpack */}
               <rect

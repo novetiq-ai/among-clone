@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { TestTube, Check, AlertCircle } from 'lucide-react';
+import { TestTube, Check } from 'lucide-react';
 import { sound } from '@/lib/sound';
 
 interface InspectSampleTaskProps {

@@ -13,6 +13,13 @@ interface MainMenuProps {
   error: string | null;
 }
 
+const ROOM_CODE_LENGTH = 6;
+const ROOM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
+
+function normalizeRoomCode(value: string) {
+  return value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, '').slice(0, ROOM_CODE_LENGTH);
+}
+
 export function MainMenu({
   initialRoomCode = '',
   onCreateRoom,
@@ -20,9 +27,9 @@ export function MainMenu({
   isLoading,
   error,
 }: MainMenuProps) {
-  const [name, setName] = useState('Crewmate');
+  const [name, setName] = useState('Pilot');
   const [selectedColor, setSelectedColor] = useState<PlayerColor>('red');
-  const [roomCodeInput, setRoomCodeInput] = useState(initialRoomCode);
+  const [roomCodeInput, setRoomCodeInput] = useState(() => normalizeRoomCode(initialRoomCode));
   const [activeMode, setActiveMode] = useState<'menu' | 'join' | 'create' | 'help'>(
     initialRoomCode ? 'join' : 'menu'
   );
@@ -35,8 +42,9 @@ export function MainMenu({
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !roomCodeInput.trim() || isLoading) return;
-    onJoinRoom(roomCodeInput.trim(), name.trim(), selectedColor);
+    const normalizedRoomCode = normalizeRoomCode(roomCodeInput);
+    if (!name.trim() || !ROOM_CODE_PATTERN.test(normalizedRoomCode) || isLoading) return;
+    onJoinRoom(normalizedRoomCode, name.trim(), selectedColor);
   };
 
   return (
@@ -47,25 +55,15 @@ export function MainMenu({
       {/* Subtle Star Grid Overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b12_1px,transparent_1px),linear-gradient(to_bottom,#1e293b12_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none" />
 
-      {/* Top Telemetry Header */}
-      <header className="relative z-10 flex items-center justify-between px-6 sm:px-8 py-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-red-600 rounded-full border-2 border-slate-100 flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.5)]">
-            <div className="w-6 h-3 bg-blue-300 rounded-sm opacity-70" />
+      {/* Top Brand Header */}
+      <header className="relative z-10 flex min-w-0 items-center px-3 py-3.5 sm:px-8 sm:py-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+          <div aria-hidden="true" className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 bg-red-600 rounded-full border-2 border-slate-100 flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+            <div className="w-5 h-2.5 sm:w-6 sm:h-3 bg-blue-300 rounded-sm opacity-70" />
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-amber-300">
-              NEBULA: AMONG US 2D
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-mono text-emerald-400 font-semibold">PEER_NET: ONLINE</span>
-          </div>
-          <span className="text-xs font-mono text-slate-500 hidden sm:inline">v1.0.0-p2p</span>
+          <h1 className="min-w-0 truncate text-base sm:text-2xl font-black tracking-tight sm:tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-amber-300">
+            NEBULA DECEPTION
+          </h1>
         </div>
       </header>
 
@@ -73,7 +71,12 @@ export function MainMenu({
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 sm:p-8 max-w-4xl mx-auto w-full">
         {/* Error Alert */}
         {error && (
-          <div className="w-full mb-6 bg-red-950/70 border border-red-500/50 rounded-2xl p-4 flex items-start gap-3 text-red-200 text-xs shadow-lg shadow-red-950/50">
+          <div
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            className="w-full mb-6 bg-red-950/70 border border-red-500/50 rounded-2xl p-4 flex items-start gap-3 text-red-200 text-xs shadow-lg shadow-red-950/50"
+          >
             <ShieldAlert className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div className="flex-1">
               <span className="font-bold block text-red-300 uppercase tracking-wider">Verbindungsfehler</span>
@@ -100,7 +103,7 @@ export function MainMenu({
                     <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/40 px-2 py-0.5 rounded font-mono font-bold">HOST</span>
                   </h3>
                   <p className="text-sm text-slate-400 mb-6">
-                    Erstelle eine neue Spielsitzung. Du bist der Server für alle verbundenen Spieler und bestimmst die Regeln.
+                    Erstelle eine private Spielsitzung und lege die Regeln für deine Runde fest.
                   </p>
                 </div>
 
@@ -127,7 +130,7 @@ export function MainMenu({
                     <span className="text-xs bg-purple-500/20 text-purple-400 border border-purple-500/40 px-2 py-0.5 rounded font-mono font-bold">CLIENT</span>
                   </h3>
                   <p className="text-sm text-slate-400 mb-6">
-                    Verbinde dich direkt mit einem Host über einen 4-stelligen Raumcode oder den Einladungs-Link.
+                    Tritt einer privaten Runde mit einem 6-stelligen Raumcode oder Einladungslink bei.
                   </p>
                 </div>
 
@@ -144,7 +147,7 @@ export function MainMenu({
             {/* Identity Calibration Card */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
               <h4 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center justify-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" /> Identity Calibration
+                <Sparkles className="w-4 h-4 text-amber-400" /> Identität konfigurieren
               </h4>
 
               <div className="flex flex-col md:flex-row justify-center items-center gap-8">
@@ -152,17 +155,21 @@ export function MainMenu({
                 <div className="w-36 h-44 bg-slate-800/90 rounded-2xl relative flex flex-col items-center justify-center border-2 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.25)] p-3">
                   <AstronautAvatar color={selectedColor} size={76} />
                   <div className="absolute -bottom-3 bg-red-600 border border-red-400 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-md">
-                    {name || 'CREWMATE'}
+                    {name || 'PILOT'}
                   </div>
                 </div>
 
                 {/* Name & Color Controls */}
                 <div className="flex-1 w-full flex flex-col gap-4">
                   <div>
-                    <label className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    <label
+                      htmlFor="main-menu-player-name"
+                      className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1.5"
+                    >
                       Spielername:
                     </label>
                     <input
+                      id="main-menu-player-name"
                       type="text"
                       maxLength={12}
                       value={name}
@@ -172,11 +179,11 @@ export function MainMenu({
                     />
                   </div>
 
-                  <div>
-                    <label className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                  <fieldset>
+                    <legend className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block mb-2">
                       Anzug-Farbe:
-                    </label>
-                    <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
+                    </legend>
+                    <div className="grid grid-cols-4 justify-items-center gap-2 sm:grid-cols-12">
                       {PLAYER_COLORS.map((c) => {
                         const isSelected = selectedColor === c.id;
                         return (
@@ -184,8 +191,10 @@ export function MainMenu({
                             key={c.id}
                             type="button"
                             onClick={() => setSelectedColor(c.id)}
+                            aria-label={'Anzugfarbe ' + c.name + (isSelected ? ', ausgewählt' : '')}
+                            aria-pressed={isSelected}
                             title={c.name}
-                            className={`w-8 h-8 rounded-full transition-all cursor-pointer ${
+                            className={`h-11 w-11 rounded-full transition-all cursor-pointer sm:h-8 sm:w-8 ${
                               isSelected
                                 ? 'ring-2 ring-white ring-offset-4 ring-offset-slate-900 scale-110 shadow-lg'
                                 : 'hover:scale-105 border border-black/40'
@@ -195,7 +204,7 @@ export function MainMenu({
                         );
                       })}
                     </div>
-                  </div>
+                  </fieldset>
                 </div>
               </div>
             </div>
@@ -204,10 +213,10 @@ export function MainMenu({
             <div className="flex justify-center">
               <button
                 onClick={() => setActiveMode('help')}
-                className="text-xs font-mono text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer py-1"
+                className="min-h-11 px-2 py-2 text-xs font-mono text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
-                <span>Wie funktioniert die P2P-Verbindung?</span>
+                <span>Wie funktioniert die Direktverbindung?</span>
               </button>
             </div>
           </div>
@@ -249,7 +258,7 @@ export function MainMenu({
                   className="w-2/3 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-blue-900/50 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <span className="animate-pulse">Initialisiere Peer...</span>
+                    <span className="animate-pulse">Raum wird erstellt...</span>
                   ) : (
                     <>
                       <span>Session Starten</span>
@@ -271,24 +280,35 @@ export function MainMenu({
               </div>
               <div>
                 <h3 className="text-xl font-black text-white">Raum Beitreten</h3>
-                <p className="text-xs text-slate-400">Gib den 4-stelligen Code des Hosts ein</p>
+                <p className="text-xs text-slate-400">Gib den 6-stelligen Code der privaten Runde ein</p>
               </div>
             </div>
 
             <form onSubmit={handleJoin} className="flex flex-col gap-5">
               <div>
-                <label className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                  4-Stelliger Koordinaten-Code
+                <label htmlFor="room-code" className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  6-stelliger Raumcode
                 </label>
                 <input
+                  id="room-code"
                   type="text"
-                  maxLength={4}
+                  minLength={ROOM_CODE_LENGTH}
+                  maxLength={ROOM_CODE_LENGTH}
+                  pattern="[A-HJ-NP-Z2-9]{6}"
+                  required
                   value={roomCodeInput}
-                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase().slice(0, 4))}
-                  placeholder="Z.B. X4Z9"
+                  onChange={(e) => setRoomCodeInput(normalizeRoomCode(e.target.value))}
+                  placeholder="Z. B. X4Z9Q7"
+                  aria-describedby="room-code-hint"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
                   className="w-full bg-slate-950 border border-purple-500/50 rounded-xl px-4 py-3.5 font-mono text-center text-3xl font-black tracking-widest text-purple-400 focus:outline-none focus:border-purple-400 uppercase shadow-inner"
                   autoFocus
                 />
+                <p id="room-code-hint" className="mt-2 text-[11px] text-slate-400">
+                  Erlaubt sind A–H, J–N, P–Z und 2–9.
+                </p>
               </div>
 
               <div className="flex gap-3">
@@ -301,14 +321,14 @@ export function MainMenu({
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading || !name.trim() || !roomCodeInput.trim()}
+                  disabled={isLoading || !name.trim() || !ROOM_CODE_PATTERN.test(roomCodeInput)}
                   className="w-2/3 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-purple-900/50 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                 >
                   {isLoading ? (
-                    <span className="animate-pulse">Verbinde Relay...</span>
+                    <span className="animate-pulse">Verbindung wird aufgebaut...</span>
                   ) : (
                     <>
-                      <span>Connect Peer</span>
+                      <span>Runde beitreten</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -322,16 +342,18 @@ export function MainMenu({
         {activeMode === 'help' && (
           <div className="w-full max-w-lg bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
             <h4 className="font-bold text-white flex items-center gap-2 text-base mb-3">
-              <Sparkles className="w-5 h-5 text-amber-400" /> P2P WebRTC Relay Funktionsweise
+              <Sparkles className="w-5 h-5 text-amber-400" /> Direktverbindung im Browser
             </h4>
             <div className="space-y-3 text-xs text-slate-300 leading-relaxed bg-slate-950/70 p-4 rounded-xl border border-slate-800 mb-6">
               <p>
-                Dieses Spiel verwendet <strong>PeerJS &amp; WebRTC</strong> für direkte Browser-zu-Browser-Kommunikation.
+                Nebula Deception verbindet private Runden über WebRTC.
               </p>
               <ul className="list-disc list-inside space-y-1.5 text-slate-400">
-                <li><strong className="text-slate-200">Host:</strong> Hält den aktuellen Spielstatus (Positionen, Kills, Abstimmungen) in-memory.</li>
-                <li><strong className="text-slate-200">Client:</strong> Tauscht Delta-Updates in Echtzeit über direkte Datenkanäle aus.</li>
-                <li><strong className="text-slate-200">Keine Server-Kosten:</strong> Vollständig serverlos und autark hostbar.</li>
+                <li><strong className="text-slate-200">Host:</strong> Erstellt die Runde und legt die Regeln fest.</li>
+                <li><strong className="text-slate-200">Mitspieler:</strong> Treten per Raumcode oder Einladungslink bei.</li>
+                <li>
+                  <strong className="text-slate-200">Netzwerk:</strong> Der tatsächliche Verbindungsweg hängt von Browser und Netzwerk ab.
+                </li>
               </ul>
             </div>
             <button
@@ -344,15 +366,10 @@ export function MainMenu({
         )}
       </main>
 
-      {/* Telemetry Footer */}
-      <footer className="relative z-10 h-12 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm flex items-center px-6 sm:px-8 justify-between">
-        <div className="flex items-center gap-4 sm:gap-6 text-[10px] font-mono text-slate-500">
-          <span className="text-emerald-500 font-semibold">● P2P_ENCRYPTION_ACTIVE</span>
-          <span className="hidden sm:inline">LATENCY: ~20ms</span>
-          <span>PEERS: READY</span>
-        </div>
+      <footer className="relative z-10 min-h-12 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm flex items-center gap-3 px-3 py-3 sm:px-8 justify-between">
+        <span className="text-[10px] font-mono font-semibold text-slate-400">NEBULA DECEPTION</span>
         <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-          Next.js + PeerJS Frame v1.0
+          Private Browserrunde
         </div>
       </footer>
     </div>

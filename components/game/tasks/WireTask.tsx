@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Check } from 'lucide-react';
 import { sound } from '@/lib/sound';
 
@@ -15,6 +15,17 @@ const WIRE_COLORS = [
   { id: 'yellow', name: 'Gelb', hex: '#eab308' },
   { id: 'pink', name: 'Pink', hex: '#ec4899' },
 ];
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface PinLayout {
+  width: number;
+  left: Record<string, Point>;
+  right: Record<string, Point>;
+}
 
 export function WireTask({ onComplete, onClose }: WireTaskProps) {
   const onCompleteRef = useRef(onComplete);
@@ -34,6 +45,8 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftPinRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const rightPinRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [pinLayout, setPinLayout] = useState<PinLayout>({ width: 480, left: {}, right: {} });
+  const activePointerRef = useRef<{ pointerId: number; target: HTMLDivElement; leftId: string } | null>(null);
 
   const isAllConnected = 
     Object.keys(connections).length === 4 &&
@@ -50,47 +63,117 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
     }
   }, [isAllConnected]);
 
-  // Coordinates helper dynamically measuring pin elements
-  const getLeftPinPos = (colorId: string) => {
-    const el = leftPinRefs.current[colorId];
-    if (el && containerRef.current) {
-      const contRect = containerRef.current.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      return {
-        x: elRect.left + elRect.width / 2 - contRect.left,
-        y: elRect.top + elRect.height / 2 - contRect.top,
-      };
+  // Measure pins after commit, then render wires from state. Reading DOM refs
+  // during render breaks React's purity guarantees and produced stale lines.
+  const measurePinLayout = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const measurePins = (elements: Record<string, HTMLDivElement | null>) => {
+      const positions: Record<string, Point> = {};
+      for (const wire of WIRE_COLORS) {
+        const element = elements[wire.id];
+        if (!element) continue;
+        const rect = element.getBoundingClientRect();
+        positions[wire.id] = {
+          x: rect.left + rect.width / 2 - containerRect.left,
+          y: rect.top + rect.height / 2 - containerRect.top,
+        };
+      }
+      return positions;
+    };
+
+    setPinLayout({
+      width: containerRect.width,
+      left: measurePins(leftPinRefs.current),
+      right: measurePins(rightPinRefs.current),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    measurePinLayout();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measurePinLayout);
+      return () => window.removeEventListener('resize', measurePinLayout);
     }
-    const idx = leftWires.findIndex((w) => w.id === colorId);
-    return { x: 44, y: 104 + (idx >= 0 ? idx : 0) * 64 };
+
+    const observer = new ResizeObserver(() => measurePinLayout());
+    observer.observe(container);
+    for (const element of [...Object.values(leftPinRefs.current), ...Object.values(rightPinRefs.current)]) {
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [measurePinLayout]);
+
+  const getLeftPinPos = (colorId: string): Point => {
+    const measured = pinLayout.left[colorId];
+    if (measured) return measured;
+    const index = leftWires.findIndex((wire) => wire.id === colorId);
+    return { x: 44, y: 104 + Math.max(0, index) * 64 };
   };
 
-  const getRightPinPos = (colorId: string) => {
-    const el = rightPinRefs.current[colorId];
-    if (el && containerRef.current) {
-      const contRect = containerRef.current.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      return {
-        x: elRect.left + elRect.width / 2 - contRect.left,
-        y: elRect.top + elRect.height / 2 - contRect.top,
-      };
-    }
-    const idx = rightWires.findIndex((w) => w.id === colorId);
-    const contWidth = containerRef.current?.clientWidth || 480;
-    return { x: contWidth - 44, y: 104 + (idx >= 0 ? idx : 0) * 64 };
+  const getRightPinPos = (colorId: string): Point => {
+    const measured = pinLayout.right[colorId];
+    if (measured) return measured;
+    const index = rightWires.findIndex((wire) => wire.id === colorId);
+    return { x: pinLayout.width - 44, y: 104 + Math.max(0, index) * 64 };
   };
+
+  const releaseActivePointer = useCallback((pointerId?: number) => {
+    const active = activePointerRef.current;
+    if (!active || (pointerId !== undefined && active.pointerId !== pointerId)) return;
+
+    try {
+      if (active.target.hasPointerCapture(active.pointerId)) {
+        active.target.releasePointerCapture(active.pointerId);
+      }
+    } catch {
+      // The browser may already have released capture during cancellation.
+    }
+    activePointerRef.current = null;
+    setDraggingLeftId(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const active = activePointerRef.current;
+      if (!active) return;
+      try {
+        if (active.target.hasPointerCapture(active.pointerId)) {
+          active.target.releasePointerCapture(active.pointerId);
+        }
+      } catch {
+        // The element can already be detached while the task is closing.
+      }
+      activePointerRef.current = null;
+    };
+  }, []);
 
   const handlePointerDown = (leftId: string, e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerRef.current && activePointerRef.current.pointerId !== e.pointerId) return;
     e.preventDefault();
+
+    const target = e.currentTarget;
+    activePointerRef.current = { pointerId: e.pointerId, target, leftId };
     try {
-      e.currentTarget.setPointerCapture(e.pointerId);
+      target.setPointerCapture(e.pointerId);
     } catch {
-      // ignore
+      // Pointer capture is optional on older browsers; container events still work.
     }
+
+    const container = containerRef.current;
+    if (!container) {
+      releaseActivePointer(e.pointerId);
+      return;
+    }
+
     sound.playButtonClick();
     setDraggingLeftId(leftId);
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = container.getBoundingClientRect();
     setCursorPos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -98,8 +181,10 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggingLeftId || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    const active = activePointerRef.current;
+    const container = containerRef.current;
+    if (!active || active.pointerId !== e.pointerId || !container) return;
+    const rect = container.getBoundingClientRect();
     setCursorPos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -107,46 +192,55 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!draggingLeftId || !containerRef.current) {
-      setDraggingLeftId(null);
+    const active = activePointerRef.current;
+    const container = containerRef.current;
+    if (!active || active.pointerId !== e.pointerId || !container) {
+      releaseActivePointer(e.pointerId);
       return;
     }
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    const draggingId = active.leftId;
+    const rect = container.getBoundingClientRect();
+    const pointerX = e.clientX - rect.left;
+    const pointerY = e.clientY - rect.top;
 
-    // Check if released close to any right pin
     let connectedRightId: string | null = null;
-    rightWires.forEach((right) => {
+    for (const right of rightWires) {
       const pinPos = getRightPinPos(right.id);
-      const dist = Math.hypot(mouseX - pinPos.x, mouseY - pinPos.y);
-      if (dist < 45) {
-        connectedRightId = right.id;
-      }
-    });
+      const distance = Math.hypot(pointerX - pinPos.x, pointerY - pinPos.y);
+      if (distance < 45) connectedRightId = right.id;
+    }
 
     if (connectedRightId) {
+      const destinationId = connectedRightId;
       sound.playShieldClick();
-      setConnections((prev) => {
-        const next = { ...prev };
-        // Disallow duplicate pins: remove any other wire that was on this right pin
+      setConnections((previous) => {
+        const next = { ...previous };
         for (const [leftKey, rightKey] of Object.entries(next)) {
-          if (rightKey === connectedRightId) {
-            delete next[leftKey];
-          }
+          if (rightKey === destinationId) delete next[leftKey];
         }
-        next[draggingLeftId] = connectedRightId!;
+        next[draggingId] = destinationId;
         return next;
       });
     } else {
-      setConnections((prev) => {
-        const next = { ...prev };
-        delete next[draggingLeftId];
+      setConnections((previous) => {
+        const next = { ...previous };
+        delete next[draggingId];
         return next;
       });
     }
 
+    releaseActivePointer(e.pointerId);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    releaseActivePointer(e.pointerId);
+  };
+
+  const handleLostPointerCapture = (e: React.PointerEvent) => {
+    const active = activePointerRef.current;
+    if (!active || active.pointerId !== e.pointerId) return;
+    activePointerRef.current = null;
     setDraggingLeftId(null);
   };
 
@@ -155,13 +249,15 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
       ref={containerRef}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handleLostPointerCapture}
       className="relative w-full max-w-[480px] bg-slate-900 border-4 border-slate-700 rounded-3xl p-6 shadow-2xl overflow-hidden select-none font-sans"
       style={{ touchAction: 'none' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-6">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
+          <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse motion-reduce:animate-none" />
           <h3 className="font-black uppercase text-sm tracking-wider text-slate-200 font-mono">
             KABEL VERBINDEN
           </h3>
@@ -257,7 +353,7 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
                     leftPinRefs.current[wire.id] = el;
                   }}
                   onPointerDown={(e) => handlePointerDown(wire.id, e)}
-                  className="w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-110 transition-transform touch-manipulation"
+                  className="w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-110 transition-transform motion-reduce:transform-none motion-reduce:transition-none touch-manipulation"
                   style={{ backgroundColor: wire.hex }}
                 >
                   <div className="w-3 h-3 rounded-full bg-slate-900 border border-white/50" />
@@ -279,7 +375,7 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
                   ref={(el) => {
                     rightPinRefs.current[wire.id] = el;
                   }}
-                  className={`w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center shadow-lg transition-all ${
+                  className={`w-10 h-10 rounded-xl border-2 border-slate-950 flex items-center justify-center shadow-lg transition-all motion-reduce:transition-none ${
                     isConnected ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900' : ''
                   }`}
                   style={{ backgroundColor: wire.hex }}
@@ -295,7 +391,7 @@ export function WireTask({ onComplete, onClose }: WireTaskProps) {
       {/* Status Bar */}
       <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800 text-center font-mono text-xs">
         {isAllConnected ? (
-          <span className="text-emerald-400 font-bold flex items-center justify-center gap-1.5 animate-bounce">
+          <span className="text-emerald-400 font-bold flex items-center justify-center gap-1.5 animate-bounce motion-reduce:animate-none">
             <Check className="w-4 h-4" /> AUFGABE ERFOLGREICH ABGESCHLOSSEN!
           </span>
         ) : (

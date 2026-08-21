@@ -182,7 +182,7 @@ export function SwipeCardTask({ onComplete, onClose }: SwipeCardTaskProps) {
                 <span className="font-bold">CREW_ID</span>
                 <span className="w-3 h-2 bg-yellow-400 rounded-sm" />
               </div>
-              <div className="text-[8px] opacity-75">SKELD-ADMIN</div>
+              <div className="text-[8px] opacity-75">NEBULA-OPS</div>
             </div>
           )}
         </div>

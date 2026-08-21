@@ -1,6 +1,5 @@
 import {
   ROOMS,
-  CORRIDORS,
   WALLS,
   VENTS,
   SECURITY_CAMERAS,
@@ -13,8 +12,6 @@ import {
   getNearestSafePosition,
   getCurrentRoomName,
   findBotPath,
-  MAP_WIDTH,
-  MAP_HEIGHT,
 } from '@/lib/map-data';
 import { hasLineOfSight } from '@/components/game/TheSkeldMap';
 import { Player, DeadBody } from '@/types/game';
@@ -53,7 +50,7 @@ function recordTest(passed: boolean, suite: string, name: string, details: strin
 }
 
 console.log(`${BOLD}${CYAN}========================================================================${RESET}`);
-console.log(`${BOLD}${CYAN}   AMONG US (THE SKELD) - EMPIRICAL PHYSICS & ENGINE STRESS HARNESS    ${RESET}`);
+console.log(`${BOLD}${CYAN}   NEBULA DECEPTION - EMPIRICAL PHYSICS & ENGINE STRESS HARNESS    ${RESET}`);
 console.log(`${BOLD}${CYAN}========================================================================${RESET}\n`);
 
 // ============================================================================
